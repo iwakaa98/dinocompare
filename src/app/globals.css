@@ -1,0 +1,90 @@
+@import "tailwindcss";
+
+:root {
+  --bg: #f3f7f6;
+  --surface: #e8f1ef;
+  --ink: #122826;
+  --muted: #5b6f6b;
+  --line: #cfdcd8;
+  --accent: #0f766e;
+  --accent-deep: #0b4f4a;
+  --accent-soft: #d8efea;
+  --action: #c05621;
+  --action-hover: #9a3412;
+  --glow: rgba(15, 118, 110, 0.16);
+  --background: var(--bg);
+  --foreground: var(--ink);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-body);
+  --font-display: var(--font-display);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  color: var(--ink);
+  background:
+    radial-gradient(1200px 520px at 8% -10%, rgba(45, 168, 148, 0.18), transparent 55%),
+    radial-gradient(900px 480px at 100% 0%, rgba(20, 90, 110, 0.12), transparent 50%),
+    radial-gradient(700px 400px at 50% 100%, rgba(15, 118, 110, 0.08), transparent 60%),
+    var(--bg);
+  font-family: var(--font-body), system-ui, sans-serif;
+}
+
+::selection {
+  background: var(--accent-soft);
+  color: var(--accent-deep);
+}
+
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes soft-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+.animate-rise {
+  animation: rise-in 0.7s ease both;
+}
+
+.animate-rise-delay {
+  animation: rise-in 0.8s ease 0.12s both;
+}
+
+.animate-float {
+  animation: soft-float 5.5s ease-in-out infinite;
+}
+
+.hero-grid {
+  background-image:
+    linear-gradient(rgba(15, 118, 110, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(15, 118, 110, 0.04) 1px, transparent 1px);
+  background-size: 28px 28px;
+  mask-image: radial-gradient(ellipse at center, black 35%, transparent 75%);
+}

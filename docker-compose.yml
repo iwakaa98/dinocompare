@@ -1,0 +1,19 @@
+services:
+  db:
+    image: postgres:16-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: dentsravni
+      POSTGRES_PASSWORD: dentsravni
+      POSTGRES_DB: dentsravni
+    volumes:
+      - dentsravni_pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dentsravni"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  dentsravni_pg:
