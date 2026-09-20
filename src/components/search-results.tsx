@@ -167,8 +167,9 @@ export function SearchResults({ result }: { result: SearchResult }) {
             Няма потвърдена цена
           </h2>
           <p className="mt-2 text-[var(--muted)]">
-            За „{result.query}“ не намерихме продуктови страници с това
-            заглавие. Не показваме цена и не пращаме към ?search.
+            За „{result.query}“ магазините още не върнаха продуктова страница
+            с цена. Пробвайте отново след малко или по-краткото търговско име
+            — например „Septanest“, „Filtek“, „OptiBond FL“.
           </p>
         </div>
         <UncheckedShops result={result} />
@@ -186,9 +187,9 @@ export function SearchResults({ result }: { result: SearchResult }) {
           {result.product.name}
         </h2>
         <p className="mt-2 max-w-2xl text-[var(--muted)]">
-          {result.product.brand} · {result.product.category}. Проверяваме
-          списък от магазини и резултати от търсачки. Линкът отваря конкретния
-          продукт, намерен по заглавие — не страница за търсене.
+          {result.product.brand} · {result.product.category}. Показваме всички
+          намерени варианти с потвърдена цена. Най-адекватните за кабинета са
+          отгоре, после по крайна цена.
         </p>
         <p className="mt-2 text-xs leading-relaxed text-[var(--muted)]">
           {result.priceDisclaimer}
@@ -200,7 +201,7 @@ export function SearchResults({ result }: { result: SearchResult }) {
 
       {result.offers.map((offer, index) => (
         <OfferRow
-          key={`${offer.supplierId}-${offer.packLabel}`}
+          key={`${offer.supplierId}-${offer.productUrl}`}
           offer={offer}
           rank={index + 1}
           product={result.product}

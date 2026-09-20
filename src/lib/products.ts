@@ -439,11 +439,12 @@ export const CATALOG: CatalogProduct[] = [
   },
   {
     slug: "septodont-septanest",
-    name: "Septanest 1:100000",
+    name: "Septanest",
     brand: "Septodont",
     category: "Анестезия",
-    unit: "50 карпули",
-    description: "Артикаин с адреналин за локална анестезия.",
+    unit: "50 карпули · 1:100000 / 1:200000",
+    description:
+      "Артикаин с адреналин. 1:100000 е по-често за кабинета; 1:200000 също се показва.",
     aliases: [
       "septanest",
       "септанест",
@@ -452,7 +453,7 @@ export const CATALOG: CatalogProduct[] = [
       "анестезия карпули",
       "septodont",
     ],
-    searchQuery: "Septanest 1:100000",
+    searchQuery: "Septanest",
   },
   {
     slug: "dentsply-protaper-next",

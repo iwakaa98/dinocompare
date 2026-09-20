@@ -91,6 +91,11 @@ function shopQueries(query: string): string[] {
 }
 
 function tokenHits(hay: string, part: string): boolean {
+  if (part.length <= 2) {
+    return new RegExp(`(?:^|[^\\p{L}\\p{N}])${part}(?:[^\\p{L}\\p{N}]|$)`, "iu").test(
+      hay
+    );
+  }
   if (hay.includes(part)) return true;
   return (TOKEN_SYNONYMS[part] ?? []).some((alt) => hay.includes(alt));
 }
@@ -120,13 +125,7 @@ function looksWrongVariant(title: string, query: string): boolean {
   const t = title.toLowerCase();
   const q = query.toLowerCase();
   if (/\bflow\b|флоу/.test(t) && !/\bflow\b|флоу/.test(q)) return true;
-  if (
-    /\b(kit|комплект|mini body)\b/.test(t) &&
-    !/\b(kit|комплект)\b/.test(q) &&
-    !looksLikeAnestheticPack(t)
-  ) {
-    return true;
-  }
+  if (/\bmini body\b/.test(t) && !/\bmini body\b/.test(q)) return true;
   const anestheticQuery = /septanest|септанест|scandonest|арти\s*каин|артикаин|анестез/.test(
     q
   );
@@ -138,11 +137,20 @@ function looksWrongVariant(title: string, query: string): boolean {
       return true;
     }
     if (/за карпул|for carp|für carp/.test(t)) return true;
-    const wanted = adrenalineRatio(q);
-    const found = adrenalineRatio(t);
-    if (wanted && found && wanted !== found) return true;
+  }
+  if (/optibond/i.test(q) && /\bfl\b/i.test(q)) {
+    if (/solo|universal|extra|ецващ|etchant/i.test(t) && !/\bfl\b/i.test(t)) {
+      return true;
+    }
   }
   return false;
+}
+
+function isStrongToken(token: string): boolean {
+  if (TOKEN_SYNONYMS[token]) return true;
+  if (isWeakToken(token)) return false;
+  if (token.length >= 4) return true;
+  return token.length === 2 && !/^[abcd][1-4]$/i.test(token);
 }
 
 function titleMatches(title: string, query: string): boolean {
@@ -152,7 +160,9 @@ function titleMatches(title: string, query: string): boolean {
   if (!parts.length) {
     return tokens(query).some((part) => hay.includes(part));
   }
-  if (!parts.every((part) => tokenHits(hay, part))) return false;
+  const required = parts.filter(isStrongToken);
+  const need = required.length ? required : parts;
+  if (!need.every((part) => tokenHits(hay, part))) return false;
   const shade = query.toLowerCase().match(/\b([abcd][1-4])\b/);
   if (shade && /\b[abcd][1-4]\b/.test(hay) && !hay.includes(shade[1])) {
     return false;
@@ -172,6 +182,31 @@ function titleScore(title: string, query: string): number {
   if (shade && hay.includes(shade[1])) hits += 1;
   const max = parts.reduce((sum, part) => sum + (part.length >= 4 ? 2 : 1), 0) + (shade ? 1 : 0);
   return hits / max;
+}
+
+function dentistBoost(title: string, query: string): number {
+  const userRatio = adrenalineRatio(query);
+  const titleRatio = adrenalineRatio(title);
+  if (userRatio) return titleRatio === userRatio ? 3 : titleRatio ? 0.35 : 1;
+  if (/septanest|септанест|scandonest|articain|артикаин/i.test(`${query} ${title}`)) {
+    if (titleRatio === "100000") return 2;
+    if (titleRatio === "200000") return 1;
+  }
+  if (/optibond/i.test(query) && /\bfl\b/i.test(query)) {
+    if (/kit|комплект|праймер и адхезив|primer.+adhes/i.test(title)) return 2.2;
+    if (/\bfl\b/i.test(title)) return 1.2;
+  }
+  return 0;
+}
+
+function dedupeHits(hits: LiveHit[]): LiveHit[] {
+  const unique = new Map<string, LiveHit>();
+  for (const hit of hits) {
+    const key = hit.url.replace(/\/+$/, "").toLowerCase();
+    const prev = unique.get(key);
+    if (!prev || hit.priceEur < prev.priceEur) unique.set(key, hit);
+  }
+  return [...unique.values()];
 }
 
 function isSearchUrl(url: string): boolean {
@@ -320,11 +355,11 @@ async function searchWoo(
   supplier: Supplier,
   query: string,
   matchQuery = query
-): Promise<LiveHit | null> {
+): Promise<LiveHit[]> {
   const origin = new URL(supplier.url).origin;
   const url = `${origin}/wp-json/wc/store/v1/products?search=${encodeURIComponent(query)}&per_page=16`;
   const text = await fetchText(url, 4000, "application/json");
-  if (!text || !text.trim().startsWith("[")) return null;
+  if (!text || !text.trim().startsWith("[")) return [];
   let items: Array<{
     name?: string;
     permalink?: string;
@@ -338,7 +373,7 @@ async function searchWoo(
   try {
     items = JSON.parse(text);
   } catch {
-    return null;
+    return [];
   }
   const ranked = items
     .map((item) => ({
@@ -347,23 +382,32 @@ async function searchWoo(
     }))
     .filter(
       (row) =>
-        row.score >= 0.35 &&
+        row.score >= 0.28 &&
         titleMatches(row.item.name ?? "", matchQuery) &&
-        row.item.permalink
+        row.item.permalink &&
+        !isSearchUrl(row.item.permalink)
     )
-    .sort((a, b) => b.score - a.score);
-  const best = ranked[0]?.item;
-  if (!best?.permalink || isSearchUrl(best.permalink)) return null;
-  const minor = best.prices?.currency_minor_unit ?? 2;
-  const raw = Number(best.prices?.sale_price || best.prices?.price || 0);
-  if (!raw) return null;
-  const amount = raw / 10 ** minor;
-    return {
-    supplier,
-    title: best.name ?? query,
-    url: best.permalink,
-    priceEur: toEurAmount(amount, best.prices?.currency_code ?? "EUR"),
-  };
+    .sort(
+      (a, b) =>
+        dentistBoost(b.item.name ?? "", matchQuery) +
+        b.score -
+        (dentistBoost(a.item.name ?? "", matchQuery) + a.score)
+    );
+
+  const hits: LiveHit[] = [];
+  for (const row of ranked.slice(0, 8)) {
+    const minor = row.item.prices?.currency_minor_unit ?? 2;
+    const raw = Number(row.item.prices?.sale_price || row.item.prices?.price || 0);
+    if (!raw || !row.item.permalink) continue;
+    hits.push({
+      supplier,
+      title: row.item.name ?? query,
+      url: row.item.permalink,
+      priceEur: toEurAmount(raw / 10 ** minor, row.item.prices?.currency_code ?? "EUR"),
+    });
+    if (hits.length >= 4) break;
+  }
+  return hits;
 }
 
 async function searchShopifyCatalog(
@@ -677,7 +721,7 @@ async function hydrateFromProductPage(
   const visible = jsonLd?.price || meta?.price ? null : parseVisiblePrice(html);
   const title = decodeHtml(jsonLd?.title || meta?.title || fallbackTitle);
   if (looksWrongVariant(title, query)) return null;
-  if (!titleMatches(title, query) && titleScore(title, query) < 0.7) return null;
+  if (!titleMatches(title, query)) return null;
   const price = jsonLd?.price || meta?.price || visible?.price;
   if (!price) return null;
   const currency = jsonLd?.currency || meta?.currency || visible?.currency || "EUR";
@@ -713,8 +757,10 @@ async function searchHtml(
   supplier: Supplier,
   query: string,
   matchQuery = query
-): Promise<LiveHit | null> {
+): Promise<LiveHit[]> {
   const host = hostOf(supplier);
+  const hits: LiveHit[] = [];
+  const seen = new Set<string>();
   for (const searchUrl of shopSearchCandidates(supplier, query).slice(0, 3)) {
     const raw = await fetchText(searchUrl, 7000);
     if (!raw) continue;
@@ -740,25 +786,30 @@ async function searchHtml(
           !isSearchUrl(link.href) &&
           !looksWrongVariant(link.title, matchQuery) &&
           !looksWrongVariant(titleFromHref(link.href), matchQuery) &&
-          (link.score >= 0.45 || titleMatches(titleFromHref(link.href), matchQuery))
+          (link.score >= 0.28 || titleMatches(titleFromHref(link.href), matchQuery))
       )
       .sort((a, b) => {
-        const kit = (title: string) => (/kit|комплект/i.test(title) ? 0.08 : 0);
-        return b.score + kit(b.title) - (a.score + kit(a.title));
+        const boost = (title: string) => dentistBoost(title, matchQuery);
+        return boost(b.title) + b.score - (boost(a.title) + a.score);
       });
-    for (const link of links.slice(0, 8)) {
+    for (const link of links.slice(0, 10)) {
+      const key = link.href.replace(/\/+$/, "").toLowerCase();
+      if (seen.has(key)) continue;
       const listed = priceNearUrl(html, link.href);
       if (
         listed &&
         (titleMatches(link.title, matchQuery) ||
           titleMatches(titleFromHref(link.href), matchQuery))
       ) {
-        return {
+        seen.add(key);
+        hits.push({
           supplier,
           title: link.title,
           url: link.href,
           priceEur: listed,
-        };
+        });
+        if (hits.length >= 4) return hits;
+        continue;
       }
       const hit = await hydrateFromProductPage(
         supplier,
@@ -766,10 +817,14 @@ async function searchHtml(
         link.title,
         matchQuery
       );
-      if (hit) return hit;
+      if (!hit) continue;
+      seen.add(hit.url.replace(/\/+$/, "").toLowerCase());
+      hits.push(hit);
+      if (hits.length >= 4) return hits;
     }
+    if (hits.length >= 2) return hits;
   }
-  return null;
+  return hits;
 }
 
 function sitemapPriority(url: string): number {
@@ -908,20 +963,22 @@ function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T | null> {
   });
 }
 
-async function searchFast(supplier: Supplier, query: string): Promise<LiveHit | null> {
+async function searchFast(supplier: Supplier, query: string): Promise<LiveHit[]> {
   const queries = shopQueries(query);
-  return withTimeout(
+  const found = await withTimeout(
     (async () => {
+      const collected: LiveHit[] = [];
       for (const q of queries) {
-        const woo = await searchWoo(supplier, q, query);
-        if (woo) return woo;
-        const html = await searchHtml(supplier, q, query);
-        if (html) return html;
+        collected.push(...(await searchWoo(supplier, q, query)));
+        if (collected.length >= 4) break;
+        collected.push(...(await searchHtml(supplier, q, query)));
+        if (collected.length >= 2) break;
       }
-      return null;
+      return dedupeHits(collected).slice(0, 4);
     })(),
-    14000
+    16000
   );
+  return found ?? [];
 }
 
 async function searchSlow(supplier: Supplier, query: string): Promise<LiveHit | null> {
@@ -1092,7 +1149,7 @@ function toOffer(hit: LiveHit): ProductOffer {
 }
 
 export async function fetchLiveOffers(query: string): Promise<LiveOfferResult> {
-  const key = `eur-v6:${query.trim().toLowerCase()}`;
+  const key = `eur-v7:${query.trim().toLowerCase()}`;
   const now = Date.now();
   const cached = cache.get(key);
   if (cached && cached.expiresAt > now) return cached.value;
@@ -1113,20 +1170,19 @@ export async function fetchLiveOffers(query: string): Promise<LiveOfferResult> {
       shops.map((supplier) => searchFast(supplier, query))
     );
     rows.forEach((result, index) => {
-      if (result.status === "fulfilled" && result.value) {
-        hits.push(result.value);
-        foundIds.add(shops[index].id);
-      }
+      if (result.status !== "fulfilled" || !result.value.length) return;
+      hits.push(...result.value);
+      foundIds.add(shops[index].id);
     });
   }
 
   await take(specialty.slice(0, 8));
 
-  if (hits.length < 5 && Date.now() - started < 20000) {
+  if (Date.now() - started < 24000) {
     await take(specialty.slice(8, 16));
   }
 
-  if (hits.length < 3 && Date.now() - started < 22000) {
+  if (hits.length < 4 && Date.now() - started < 28000) {
     const knownHosts = new Set(hits.map((hit) => hostOf(hit.supplier)));
     const extra = await withTimeout(discoverExtra(query, knownHosts), 8000);
     if (extra) {
@@ -1140,8 +1196,8 @@ export async function fetchLiveOffers(query: string): Promise<LiveOfferResult> {
     }
   }
 
-  if (hits.length < 4 && Date.now() - started < 26000) {
-    await take([...specialty.slice(12, 20), ...markets.slice(0, 2)]);
+  if (hits.length < 4 && Date.now() - started < 32000) {
+    await take([...specialty.slice(16, 24), ...markets.slice(0, 2)]);
   }
 
   const unchecked: UncheckedShop[] = SUPPLIERS.filter(
@@ -1154,17 +1210,18 @@ export async function fetchLiveOffers(query: string): Promise<LiveOfferResult> {
       "Не намерихме продуктовия линк с това име. Не показваме цена и не пращаме към търсене.",
   }));
 
-  const unique = new Map<string, LiveHit>();
-  for (const hit of hits) {
-    const host = hostOf(hit.supplier);
-    const prev = unique.get(host);
-    if (!prev || hit.priceEur < prev.priceEur) unique.set(host, hit);
-  }
+  const unique = dedupeHits(hits);
 
-  const offers = [...unique.values()]
+  const offers = unique
     .map(toOffer)
-    .sort((a, b) => a.total - b.total)
-    .slice(0, 10);
+    .sort((a, b) => {
+      const boost =
+        dentistBoost(b.productName, query) + titleScore(b.productName, query) -
+        (dentistBoost(a.productName, query) + titleScore(a.productName, query));
+      if (Math.abs(boost) > 0.2) return boost;
+      return a.total - b.total;
+    })
+    .slice(0, 16);
   const worst = offers[offers.length - 1]?.total ?? 0;
   const ranked = offers.map((offer) => ({
     ...offer,

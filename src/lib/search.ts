@@ -36,7 +36,11 @@ export async function runProductSearch(query: string): Promise<SearchResult> {
   }
 
   const product = resolveProduct(trimmed);
-  const live = await fetchLiveOffers(trimmed);
+  const liveQuery =
+    product.slug === "septodont-septanest" && !/1\s*[:/]\s*200/.test(trimmed)
+      ? product.searchQuery
+      : trimmed;
+  const live = await fetchLiveOffers(liveQuery);
   const offers = live.offers;
   const bestOffers = offers.slice(0, 10);
   const uncheckedShops = live.uncheckedShops;
@@ -130,6 +134,7 @@ async function computePopularCatalog() {
   return source.map(({ product, searchCount }) => ({
     slug: product.slug,
     name: product.name,
+    searchQuery: product.searchQuery || product.name,
     brand: product.brand,
     category: product.category,
     unit: product.unit,

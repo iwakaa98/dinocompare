@@ -5,6 +5,7 @@ import { LocalTime } from "@/components/local-time";
 type CatalogItem = {
   slug: string;
   name: string;
+  searchQuery?: string;
   brand: string;
   category: string;
   unit: string;
@@ -60,7 +61,7 @@ export function PopularCatalog({
         {items.map((item, index) => (
           <Link
             key={item.slug}
-            href={`/?q=${encodeURIComponent(item.name)}`}
+            href={`/?q=${encodeURIComponent(item.searchQuery || item.name)}`}
             className="group relative block overflow-hidden rounded-3xl border border-[var(--line)] bg-white/75 p-5 transition duration-300 hover:-translate-y-1 hover:border-[var(--accent)]/40 hover:shadow-[0_18px_40px_rgba(15,80,70,0.1)]"
             style={{ animationDelay: `${index * 60}ms` }}
           >
