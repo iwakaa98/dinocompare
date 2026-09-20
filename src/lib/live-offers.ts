@@ -316,6 +316,14 @@ function stockFromNearbyText(html: string): boolean | null {
   return null;
 }
 
+function stockAroundBuyButton(html: string): boolean | null {
+  const match = html.match(
+    /add.to.cart|in-den-warenkorb|добавяне в количката|купи|kaufen|añadir al carrito/i
+  );
+  if (!match || match.index == null) return null;
+  return stockFromNearbyText(html.slice(Math.max(0, match.index - 500), match.index + 500));
+}
+
 function stockNearUrl(html: string, url: string): boolean | null {
   const needles = [url];
   try {
@@ -1297,7 +1305,8 @@ export async function fetchLiveOffers(query: string): Promise<LiveOfferResult> {
     })
     .slice(0, 16);
   const stocked = offers.filter((offer) => offer.inStock);
-  const worst = (stocked.length ? stocked : offers).at(-1)?.total ?? 0;
+  const compareAgainst = stocked.length ? stocked : offers;
+  const worst = compareAgainst[compareAgainst.length - 1]?.total ?? 0;
   const ranked = offers.map((offer) => ({
     ...offer,
     savingsVsWorst: offer.inStock

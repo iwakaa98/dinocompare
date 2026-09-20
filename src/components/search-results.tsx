@@ -1,3 +1,5 @@
+"use client";
+
 import { ExternalLink, Package, Truck, Warehouse } from "lucide-react";
 import {
   remainingToFreeShipping,
@@ -6,7 +8,7 @@ import {
   type ProductOffer,
 } from "@/lib/products";
 import { supplierById } from "@/lib/combo";
-import type { SearchResult } from "@/lib/search";
+import type { SearchResult } from "@/lib/products";
 import { formatEur } from "@/lib/utils";
 import { AddToComboButton } from "@/components/add-to-combo-button";
 import { LocalTime } from "@/components/local-time";

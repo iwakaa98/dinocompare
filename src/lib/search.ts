@@ -6,21 +6,11 @@ import {
   PRICE_DISCLAIMER,
   resolveProduct,
   type CatalogProduct,
-  type ProductOffer,
-  type UncheckedShop,
+  type SearchResult,
 } from "@/lib/products";
 import { slugify } from "@/lib/utils";
 
-export type SearchResult = {
-  query: string;
-  product: CatalogProduct;
-  offers: ProductOffer[];
-  bestOffers: ProductOffer[];
-  checkedAt: string;
-  suppliersChecked: number;
-  priceDisclaimer: string;
-  uncheckedShops: UncheckedShop[];
-};
+export type { SearchResult };
 
 const catalogCache = new Map<
   string,

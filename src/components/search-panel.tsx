@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { LoaderCircle } from "lucide-react";
-import type { SearchResult } from "@/lib/search";
+import type { SearchResult } from "@/lib/products";
 import { SearchResults } from "@/components/search-results";
 
 export function SearchPanel({ query }: { query: string }) {

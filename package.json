@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev -H 127.0.0.1 -p 43127",
-    "build": "prisma generate && next build",
+    "build": "prisma generate && next typegen && next build",
     "start": "node scripts/start.mjs",
     "start:local": "next start -H 127.0.0.1 -p 43127",
     "lint": "eslint",

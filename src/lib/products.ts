@@ -74,6 +74,17 @@ export type CatalogProduct = {
   searchQuery: string;
 };
 
+export type SearchResult = {
+  query: string;
+  product: CatalogProduct;
+  offers: ProductOffer[];
+  bestOffers: ProductOffer[];
+  checkedAt: string;
+  suppliersChecked: number;
+  priceDisclaimer: string;
+  uncheckedShops: UncheckedShop[];
+};
+
 export const BG_FREE_SHIPPING_FROM = 60;
 export const EU_DUTY_DE_MINIMIS_EUR = 150;
 export const EU_LOW_VALUE_DUTY_EUR = 3;

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import type { ReactNode } from "react";
 import { Suspense } from "react";
 import { Fraunces, Manrope } from "next/font/google";
 import { AuthProvider } from "@/components/auth-provider";
@@ -21,7 +22,7 @@ export const metadata: Metadata = {
     "Сравнявай зъболекарски продукти по реална стойност: цена + доставка + митница. Запазай търсенията си в акаунт.",
 };
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html
       lang="bg"
