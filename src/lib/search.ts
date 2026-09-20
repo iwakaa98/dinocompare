@@ -115,15 +115,17 @@ async function computePopularCatalog() {
     stats = [];
   }
 
-  const source =
-    stats.length === 0
-      ? CATALOG.slice(0, 8).map((product) => ({ product, searchCount: 0 }))
-      : stats.map((stat) => ({
-          product:
-            CATALOG.find((p) => p.slug === stat.productSlug) ??
-            resolveProduct(stat.query),
-          searchCount: stat.searchCount,
-        }));
+  const fromStats = stats.map((stat) => ({
+    product:
+      CATALOG.find((p) => p.slug === stat.productSlug) ??
+      resolveProduct(stat.query),
+    searchCount: stat.searchCount,
+  }));
+  const used = new Set(fromStats.map((row) => row.product.slug));
+  const filler = CATALOG.filter((product) => !used.has(product.slug)).map(
+    (product) => ({ product, searchCount: 0 })
+  );
+  const source = [...fromStats, ...filler].slice(0, 8);
 
   return source.map(({ product, searchCount }) => ({
     slug: product.slug,

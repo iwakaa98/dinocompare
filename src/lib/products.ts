@@ -119,6 +119,19 @@ export const SUPPLIERS: Supplier[] = [
   shop("buldent", "BulDent", "https://buldent.bg", "BG", (q) =>
     `https://buldent.bg/?s=${searchParam(q)}&post_type=product`
   ),
+  shop("veamed", "Veamed", "https://www.veamed.bg", "BG", (q) =>
+    `https://www.veamed.bg/?s=${searchParam(q)}`
+  ),
+  shop(
+    "klapperzaehnchen",
+    "Klapperzähnchen",
+    "https://klapperzaehnchen.de",
+    "EU",
+    (q) => `https://klapperzaehnchen.de/suggest?search=${searchParam(q)}`
+  ),
+  shop("cutdental", "CUT Dental", "https://cut-dental.de", "EU", (q) =>
+    `https://cut-dental.de/suggest?search=${searchParam(q)}`
+  ),
   {
     id: "dentalshop",
     name: "DentalShop.bg",
@@ -431,7 +444,14 @@ export const CATALOG: CatalogProduct[] = [
     category: "Анестезия",
     unit: "50 карпули",
     description: "Артикаин с адреналин за локална анестезия.",
-    aliases: ["septanest", "арти каин", "анестезия карпули", "septodont"],
+    aliases: [
+      "septanest",
+      "септанест",
+      "арти каин",
+      "артикаин",
+      "анестезия карпули",
+      "septodont",
+    ],
     searchQuery: "Septanest 1:100000",
   },
   {

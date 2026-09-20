@@ -46,6 +46,8 @@ const TOKEN_SYNONYMS: Record<string, string[]> = {
   z350: ["z350", "ultimate", "supreme"],
   ultimate: ["ultimate", "z350", "supreme"],
   supreme: ["supreme", "z350", "ultimate"],
+  septanest: ["septanest", "септанест"],
+  септанест: ["септанест", "septanest"],
 };
 
 function tokens(query: string): string[] {
@@ -74,21 +76,71 @@ function shopQuery(query: string): string {
   return (fallback.slice(0, 3).join(" ") || query).trim();
 }
 
+const CYRILLIC_SHOP_ALIASES: Record<string, string> = {
+  septanest: "Септанест",
+  scandonest: "Скандонест",
+  filtek: "Филтек",
+};
+
+function shopQueries(query: string): string[] {
+  const primary = shopQuery(query);
+  const extras = tokens(query)
+    .map((token) => CYRILLIC_SHOP_ALIASES[token])
+    .filter((value): value is string => Boolean(value));
+  return [...new Set([primary, ...extras].map((value) => value.trim()).filter(Boolean))];
+}
+
 function tokenHits(hay: string, part: string): boolean {
   if (hay.includes(part)) return true;
   return (TOKEN_SYNONYMS[part] ?? []).some((alt) => hay.includes(alt));
+}
+
+function adrenalineRatio(value: string): "100000" | "200000" | null {
+  const hay = normalizeHay(value);
+  if (
+    /1[:/]100000|1\/100\s*000|1:100[\s.]000|10\s*(µg|ug|микрограм)/i.test(hay)
+  ) {
+    return "100000";
+  }
+  if (
+    /1[:/]200000|1\/200\s*000|1:200[\s.]000|5\s*(µg|ug|микрограм)/i.test(hay)
+  ) {
+    return "200000";
+  }
+  return null;
+}
+
+function looksLikeAnestheticPack(title: string): boolean {
+  return /карпул|cartucho|cartridge|zylinder|ampulle|packung|кутия|50\s*x/i.test(
+    title
+  );
 }
 
 function looksWrongVariant(title: string, query: string): boolean {
   const t = title.toLowerCase();
   const q = query.toLowerCase();
   if (/\bflow\b|флоу/.test(t) && !/\bflow\b|флоу/.test(q)) return true;
-  if (/\b(kit|комплект|mini body)\b/.test(t) && !/\b(kit|комплект)\b/.test(q)) return true;
   if (
-    /спринцовка|syringe/.test(t) &&
-    /septanest|scandonest|арти\s*каин|анестез/.test(q)
+    /\b(kit|комплект|mini body)\b/.test(t) &&
+    !/\b(kit|комплект)\b/.test(q) &&
+    !looksLikeAnestheticPack(t)
   ) {
     return true;
+  }
+  const anestheticQuery = /septanest|септанест|scandonest|арти\s*каин|артикаин|анестез/.test(
+    q
+  );
+  if (anestheticQuery) {
+    if (
+      /спринцовка|syringe|spritze|lancet|koine/.test(t) &&
+      !looksLikeAnestheticPack(t)
+    ) {
+      return true;
+    }
+    if (/за карпул|for carp|für carp/.test(t)) return true;
+    const wanted = adrenalineRatio(q);
+    const found = adrenalineRatio(t);
+    if (wanted && found && wanted !== found) return true;
   }
   return false;
 }
@@ -163,6 +215,7 @@ function isProductishUrl(url: string, host: string): boolean {
     }
     const parts = path.split("/").filter(Boolean);
     const last = parts[parts.length - 1] ?? "";
+    if (parts.some((part) => part.length >= 10 && part.includes("-"))) return true;
     if (parts.length >= 2 && last.length >= 8) return true;
     return parts.length === 1 && last.length >= 10 && last.includes("-");
   } catch {
@@ -641,9 +694,11 @@ function shopSearchCandidates(supplier: Supplier, query: string): string[] {
   const q = encodeURIComponent(query);
   const extras = [
     supplier.searchUrl(query),
+    `${origin}/suggest?search=${q}`,
     `${origin}/?s=${q}&post_type=product`,
     `${origin}/?s=${q}`,
     `${origin}/search?q=${q}`,
+    `${origin}/search?sSearch=${q}`,
     `${origin}/en/search?q=${q}`,
     `${origin}/es/search?q=${q}`,
     `${origin}/catalogsearch/result/?q=${q}`,
@@ -660,7 +715,7 @@ async function searchHtml(
   matchQuery = query
 ): Promise<LiveHit | null> {
   const host = hostOf(supplier);
-  for (const searchUrl of shopSearchCandidates(supplier, query).slice(0, 2)) {
+  for (const searchUrl of shopSearchCandidates(supplier, query).slice(0, 3)) {
     const raw = await fetchText(searchUrl, 7000);
     if (!raw) continue;
     const html = unwrapSearchHtml(raw);
@@ -683,13 +738,15 @@ async function searchHtml(
         (link) =>
           isProductishUrl(link.href, host) &&
           !isSearchUrl(link.href) &&
+          !looksWrongVariant(link.title, matchQuery) &&
+          !looksWrongVariant(titleFromHref(link.href), matchQuery) &&
           (link.score >= 0.45 || titleMatches(titleFromHref(link.href), matchQuery))
       )
       .sort((a, b) => {
         const kit = (title: string) => (/kit|комплект/i.test(title) ? 0.08 : 0);
         return b.score + kit(b.title) - (a.score + kit(a.title));
       });
-    for (const link of links.slice(0, 3)) {
+    for (const link of links.slice(0, 8)) {
       const listed = priceNearUrl(html, link.href);
       if (
         listed &&
@@ -852,16 +909,18 @@ function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T | null> {
 }
 
 async function searchFast(supplier: Supplier, query: string): Promise<LiveHit | null> {
-  const q = shopQuery(query);
+  const queries = shopQueries(query);
   return withTimeout(
     (async () => {
-      const woo = await searchWoo(supplier, q, query);
-      if (woo) return woo;
-      const html = await searchHtml(supplier, q, query);
-      if (html) return html;
+      for (const q of queries) {
+        const woo = await searchWoo(supplier, q, query);
+        if (woo) return woo;
+        const html = await searchHtml(supplier, q, query);
+        if (html) return html;
+      }
       return null;
     })(),
-    12000
+    14000
   );
 }
 
@@ -1033,7 +1092,7 @@ function toOffer(hit: LiveHit): ProductOffer {
 }
 
 export async function fetchLiveOffers(query: string): Promise<LiveOfferResult> {
-  const key = `eur-v5:${query.trim().toLowerCase()}`;
+  const key = `eur-v6:${query.trim().toLowerCase()}`;
   const now = Date.now();
   const cached = cache.get(key);
   if (cached && cached.expiresAt > now) return cached.value;
@@ -1061,13 +1120,13 @@ export async function fetchLiveOffers(query: string): Promise<LiveOfferResult> {
     });
   }
 
-  await take(specialty.slice(0, 4));
+  await take(specialty.slice(0, 8));
 
-  if (hits.length < 3 && Date.now() - started < 16000) {
-    await take(specialty.slice(4, 8));
+  if (hits.length < 5 && Date.now() - started < 20000) {
+    await take(specialty.slice(8, 16));
   }
 
-  if (hits.length < 2 && Date.now() - started < 20000) {
+  if (hits.length < 3 && Date.now() - started < 22000) {
     const knownHosts = new Set(hits.map((hit) => hostOf(hit.supplier)));
     const extra = await withTimeout(discoverExtra(query, knownHosts), 8000);
     if (extra) {
@@ -1081,8 +1140,8 @@ export async function fetchLiveOffers(query: string): Promise<LiveOfferResult> {
     }
   }
 
-  if (hits.length < 2 && Date.now() - started < 22000) {
-    await take([...specialty.slice(8, 12), ...markets.slice(0, 2)]);
+  if (hits.length < 4 && Date.now() - started < 26000) {
+    await take([...specialty.slice(12, 20), ...markets.slice(0, 2)]);
   }
 
   const unchecked: UncheckedShop[] = SUPPLIERS.filter(
