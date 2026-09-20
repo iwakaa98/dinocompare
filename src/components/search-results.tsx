@@ -52,7 +52,7 @@ function OfferRow({
           </p>
         </div>
         <div className="text-left sm:text-right">
-          <p className="text-sm text-[var(--muted)]">Общо с доставка и митница</p>
+          <p className="text-sm text-[var(--muted)]">Общо на касата</p>
           <p className="font-[family-name:var(--font-display)] text-3xl text-[var(--accent-deep)]">
             {formatEur(offer.total)}
           </p>
@@ -86,7 +86,7 @@ function OfferRow({
         <div className="rounded-2xl bg-[var(--surface)] px-4 py-3">
           <dt className="flex items-center gap-1.5 text-xs text-[var(--muted)]">
             <Warehouse className="h-3.5 w-3.5" />
-            Митница / ДДС / куриер
+            Такси и ДДС
           </dt>
           <dd className="mt-1 text-sm font-semibold text-[var(--ink)]">
             {offer.customs === 0 ? "0,00 €" : formatEur(offer.customs)}
@@ -94,7 +94,16 @@ function OfferRow({
         </div>
       </dl>
 
-      {offer.customs > 0 && (
+      {(offer.surcharge > 0 || offer.shopVat > 0) && (
+        <p className="mt-2 text-xs text-[var(--muted)]">
+          {offer.surcharge > 0
+            ? `надбавка за малко количество ${formatEur(offer.surcharge)}`
+            : null}
+          {offer.surcharge > 0 && offer.shopVat > 0 ? " · " : null}
+          {offer.shopVat > 0 ? `ДДС на магазина ${formatEur(offer.shopVat)}` : null}
+        </p>
+      )}
+      {offer.customs > 0 && offer.shopVat === 0 && (
         <p className="mt-2 text-xs text-[var(--muted)]">
           мито {formatEur(offer.duty)} · вносно ДДС {formatEur(offer.importVat)} ·
           куриер {formatEur(offer.clearanceFee)}

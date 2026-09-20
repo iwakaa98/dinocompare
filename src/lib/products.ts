@@ -9,6 +9,12 @@ export type Supplier = {
   publicShop: boolean;
   vatIncludedInPrice: boolean;
   iossLikely: boolean;
+  listedPriceIsNet?: boolean;
+  sourceVatRate?: number;
+  minOrderNet?: number;
+  minOrderFeeNet?: number;
+  shippingNet?: number;
+  freeShippingFromNet?: number;
   searchUrl: (query: string) => string;
   note: string;
 };
@@ -37,6 +43,8 @@ export type ProductOffer = {
   priceKind: "listed" | "estimate";
   priceNote?: string;
   shipping: number;
+  surcharge: number;
+  shopVat: number;
   customs: number;
   duty: number;
   importVat: number;
@@ -95,6 +103,12 @@ function shop(
     publicShop: true,
     vatIncludedInPrice: extra?.vatIncludedInPrice ?? region !== "INTL",
     iossLikely: extra?.iossLikely ?? false,
+    listedPriceIsNet: extra?.listedPriceIsNet,
+    sourceVatRate: extra?.sourceVatRate,
+    minOrderNet: extra?.minOrderNet,
+    minOrderFeeNet: extra?.minOrderFeeNet,
+    shippingNet: extra?.shippingNet,
+    freeShippingFromNet: extra?.freeShippingFromNet,
     searchUrl,
     note:
       extra?.note ??
@@ -127,10 +141,30 @@ export const SUPPLIERS: Supplier[] = [
     "Klapperzähnchen",
     "https://klapperzaehnchen.de",
     "EU",
-    (q) => `https://klapperzaehnchen.de/suggest?search=${searchParam(q)}`
+    (q) => `https://klapperzaehnchen.de/suggest?search=${searchParam(q)}`,
+    {
+      listedPriceIsNet: true,
+      vatIncludedInPrice: false,
+      sourceVatRate: 0.19,
+      minOrderNet: 50,
+      minOrderFeeNet: 5,
+      shippingNet: 7.95,
+      freeShippingFromNet: 250,
+      note: "Немски B2B. Цените са без ДДС; на касата се добавят 19% и надбавка под 50 €.",
+    }
   ),
   shop("cutdental", "CUT Dental", "https://cut-dental.de", "EU", (q) =>
-    `https://cut-dental.de/suggest?search=${searchParam(q)}`
+    `https://cut-dental.de/suggest?search=${searchParam(q)}`,
+    {
+      listedPriceIsNet: true,
+      vatIncludedInPrice: false,
+      sourceVatRate: 0.19,
+      minOrderNet: 50,
+      minOrderFeeNet: 5,
+      shippingNet: 7.95,
+      freeShippingFromNet: 250,
+      note: "Немски B2B. Цените са без ДДС; на касата се добавят 19% и надбавка под 50 €.",
+    }
   ),
   {
     id: "dentalshop",
@@ -586,17 +620,60 @@ export function quoteShipment(input: {
   itemCount?: number;
 }) {
   const itemCount = input.itemCount ?? 1;
-  const shipping = shippingForShipment(input.supplier.region, input.goodsEur);
+  const supplier = input.supplier;
+  const goodsNet = input.goodsEur;
+  const netListed = Boolean(supplier.listedPriceIsNet);
+  const vatRate = netListed ? (supplier.sourceVatRate ?? 0.19) : 0;
+  const surcharge =
+    netListed &&
+    supplier.minOrderNet != null &&
+    goodsNet < supplier.minOrderNet
+      ? supplier.minOrderFeeNet ?? 0
+      : 0;
+
+  const shipping = netListed && supplier.shippingNet != null
+    ? supplier.freeShippingFromNet != null &&
+      goodsNet >= supplier.freeShippingFromNet
+      ? 0
+      : supplier.shippingNet
+    : shippingForShipment(supplier.region, goodsNet);
+
+  const shopVat = netListed
+    ? round2((goodsNet + surcharge + shipping) * vatRate)
+    : 0;
+
   const customs = customsForShipment(
-    input.supplier,
-    input.goodsEur,
+    supplier,
+    goodsNet,
     shipping,
     itemCount
   );
+
+  const extras = round2(surcharge + shopVat);
+  const note = netListed
+    ? [
+        `цената на сайта е без ДДС`,
+        `на касата +${Math.round(vatRate * 100)}% ДДС`,
+        surcharge > 0
+          ? `надбавка ${surcharge.toFixed(2)} € под ${supplier.minOrderNet} € нето`
+          : null,
+        `доставка ${shipping.toFixed(2)} € нето`,
+        `с EU ДДС номер често е reverse charge — без този 19% в касата`,
+      ]
+        .filter(Boolean)
+        .join(" · ")
+    : customs.note;
+
   return {
     shipping,
-    ...customs,
-    total: round2(input.goodsEur + shipping + customs.amount),
+    surcharge: round2(surcharge),
+    shopVat,
+    duty: customs.duty,
+    vat: round2(customs.vat + shopVat),
+    clearance: round2(customs.clearance + surcharge),
+    amount: round2(customs.amount + extras),
+    note,
+    total: round2(goodsNet + shipping + extras + customs.amount),
   };
 }
 

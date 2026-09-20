@@ -1133,6 +1133,8 @@ function toOffer(hit: LiveHit): ProductOffer {
     price: hit.priceEur,
     priceKind: "listed",
     shipping: quote.shipping,
+    surcharge: quote.surcharge,
+    shopVat: quote.shopVat,
     customs: quote.amount,
     duty: quote.duty,
     importVat: quote.vat,
@@ -1149,7 +1151,7 @@ function toOffer(hit: LiveHit): ProductOffer {
 }
 
 export async function fetchLiveOffers(query: string): Promise<LiveOfferResult> {
-  const key = `eur-v8:${query.trim().toLowerCase()}`;
+  const key = `eur-v9:${query.trim().toLowerCase()}`;
   const now = Date.now();
   const cached = cache.get(key);
   if (cached && cached.expiresAt > now) return cached.value;
