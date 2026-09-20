@@ -24,7 +24,7 @@ export type LiveOfferResult = {
 };
 
 const cache = new Map<string, { expiresAt: number; value: LiveOfferResult }>();
-const CACHE_MS = 7 * 60 * 1000;
+const CACHE_MS = 10 * 60 * 1000;
 const sitemapCache = new Map<string, { expiresAt: number; urls: string[] }>();
 const SITEMAP_MS = 30 * 60 * 1000;
 const MARKETPLACE_IDS = new Set([
@@ -279,7 +279,7 @@ function parseMoney(raw: string): number | null {
 
 const fetchWaiters: Array<() => void> = [];
 let fetchActive = 0;
-const FETCH_LIMIT = 4;
+const FETCH_LIMIT = 8;
 
 async function withFetchSlot<T>(work: () => Promise<T>): Promise<T> {
   if (fetchActive >= FETCH_LIMIT) {
@@ -296,7 +296,7 @@ async function withFetchSlot<T>(work: () => Promise<T>): Promise<T> {
 
 async function fetchText(
   url: string,
-  timeoutMs = 8000,
+  timeoutMs = 5000,
   accept = "text/html,application/xhtml+xml;q=0.9,*/*;q=0.8"
 ): Promise<string | null> {
   return withFetchSlot(async () => {
@@ -714,7 +714,7 @@ async function hydrateFromProductPage(
   query: string
 ): Promise<LiveHit | null> {
   if (isSearchUrl(url) || !isProductishUrl(url, hostOf(supplier))) return null;
-  const html = await fetchText(url, 9000);
+  const html = await fetchText(url, 5000);
   if (!html) return null;
   const jsonLd = parseJsonLdProduct(html);
   const meta = parseMetaPrice(html);
@@ -761,8 +761,8 @@ async function searchHtml(
   const host = hostOf(supplier);
   const hits: LiveHit[] = [];
   const seen = new Set<string>();
-  for (const searchUrl of shopSearchCandidates(supplier, query).slice(0, 3)) {
-    const raw = await fetchText(searchUrl, 7000);
+  for (const searchUrl of shopSearchCandidates(supplier, query).slice(0, 2)) {
+    const raw = await fetchText(searchUrl, 4000);
     if (!raw) continue;
     const html = unwrapSearchHtml(raw);
     const links = extractHrefCandidates(html, supplier.url)
@@ -792,7 +792,7 @@ async function searchHtml(
         const boost = (title: string) => dentistBoost(title, matchQuery);
         return boost(b.title) + b.score - (boost(a.title) + a.score);
       });
-    for (const link of links.slice(0, 10)) {
+    for (const link of links.slice(0, 4)) {
       const key = link.href.replace(/\/+$/, "").toLowerCase();
       if (seen.has(key)) continue;
       const listed = priceNearUrl(html, link.href);
@@ -808,7 +808,7 @@ async function searchHtml(
           url: link.href,
           priceEur: listed,
         });
-        if (hits.length >= 4) return hits;
+        if (hits.length >= 2) return hits;
         continue;
       }
       const hit = await hydrateFromProductPage(
@@ -820,9 +820,9 @@ async function searchHtml(
       if (!hit) continue;
       seen.add(hit.url.replace(/\/+$/, "").toLowerCase());
       hits.push(hit);
-      if (hits.length >= 4) return hits;
+      if (hits.length >= 2) return hits;
     }
-    if (hits.length >= 2) return hits;
+    if (hits.length >= 1) return hits;
   }
   return hits;
 }
@@ -970,13 +970,13 @@ async function searchFast(supplier: Supplier, query: string): Promise<LiveHit[]>
       const collected: LiveHit[] = [];
       for (const q of queries) {
         collected.push(...(await searchWoo(supplier, q, query)));
-        if (collected.length >= 4) break;
-        collected.push(...(await searchHtml(supplier, q, query)));
         if (collected.length >= 2) break;
+        collected.push(...(await searchHtml(supplier, q, query)));
+        if (collected.length >= 1) break;
       }
-      return dedupeHits(collected).slice(0, 4);
+      return dedupeHits(collected).slice(0, 3);
     })(),
-    16000
+    8000
   );
   return found ?? [];
 }
@@ -1149,7 +1149,7 @@ function toOffer(hit: LiveHit): ProductOffer {
 }
 
 export async function fetchLiveOffers(query: string): Promise<LiveOfferResult> {
-  const key = `eur-v7:${query.trim().toLowerCase()}`;
+  const key = `eur-v8:${query.trim().toLowerCase()}`;
   const now = Date.now();
   const cached = cache.get(key);
   if (cached && cached.expiresAt > now) return cached.value;
@@ -1176,15 +1176,17 @@ export async function fetchLiveOffers(query: string): Promise<LiveOfferResult> {
     });
   }
 
-  await take(specialty.slice(0, 8));
+  await take(specialty.slice(0, 6));
 
-  if (Date.now() - started < 24000) {
-    await take(specialty.slice(8, 16));
+  const shopCount = () => new Set(hits.map((hit) => hostOf(hit.supplier))).size;
+
+  if (shopCount() < 3 && Date.now() - started < 10000) {
+    await take(specialty.slice(6, 12));
   }
 
-  if (hits.length < 4 && Date.now() - started < 28000) {
+  if (shopCount() < 3 && Date.now() - started < 14000) {
     const knownHosts = new Set(hits.map((hit) => hostOf(hit.supplier)));
-    const extra = await withTimeout(discoverExtra(query, knownHosts), 8000);
+    const extra = await withTimeout(discoverExtra(query, knownHosts), 5000);
     if (extra) {
       for (const hit of extra) {
         const host = hostOf(hit.supplier);
@@ -1196,8 +1198,8 @@ export async function fetchLiveOffers(query: string): Promise<LiveOfferResult> {
     }
   }
 
-  if (hits.length < 4 && Date.now() - started < 32000) {
-    await take([...specialty.slice(16, 24), ...markets.slice(0, 2)]);
+  if (shopCount() < 3 && Date.now() - started < 16000) {
+    await take([...specialty.slice(12, 18), ...markets.slice(0, 2)]);
   }
 
   const unchecked: UncheckedShop[] = SUPPLIERS.filter(
