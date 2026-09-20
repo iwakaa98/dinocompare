@@ -83,10 +83,6 @@ function searchParam(query: string) {
   return encodeURIComponent(query.trim());
 }
 
-function aliexpressSearch(query: string) {
-  return `https://www.aliexpress.com/wholesale?SearchText=${searchParam(query)}`;
-}
-
 function shop(
   id: string,
   name: string,
@@ -120,15 +116,23 @@ function shop(
   };
 }
 
+const deB2b = {
+  listedPriceIsNet: true,
+  vatIncludedInPrice: false,
+  sourceVatRate: 0.19,
+  minOrderNet: 50,
+  minOrderFeeNet: 5,
+  shippingNet: 7.95,
+  freeShippingFromNet: 250,
+  note: "Немски B2B. Цените са без ДДС; на касата се добавят 19% и надбавка под 50 €.",
+} as const;
+
 export const SUPPLIERS: Supplier[] = [
   shop("patricia", "Patricia Dental", "https://patricia.bg", "BG", (q) =>
     `https://patricia.bg/catalogsearch/result/?q=${searchParam(q)}`
   ),
   shop("dentstore", "Dentstore", "https://dentstore.bg", "BG", (q) =>
     `https://dentstore.bg/cautare?s=${searchParam(q)}`
-  ),
-  shop("medicplus", "Medicplus", "https://medicplus.bg", "BG", (q) =>
-    `https://medicplus.bg/?s=${searchParam(q)}`
   ),
   shop("buldent", "BulDent", "https://buldent.bg", "BG", (q) =>
     `https://buldent.bg/?s=${searchParam(q)}&post_type=product`
@@ -142,220 +146,60 @@ export const SUPPLIERS: Supplier[] = [
     "https://klapperzaehnchen.de",
     "EU",
     (q) => `https://klapperzaehnchen.de/suggest?search=${searchParam(q)}`,
-    {
-      listedPriceIsNet: true,
-      vatIncludedInPrice: false,
-      sourceVatRate: 0.19,
-      minOrderNet: 50,
-      minOrderFeeNet: 5,
-      shippingNet: 7.95,
-      freeShippingFromNet: 250,
-      note: "Немски B2B. Цените са без ДДС; на касата се добавят 19% и надбавка под 50 €.",
-    }
+    deB2b
   ),
   shop("cutdental", "CUT Dental", "https://cut-dental.de", "EU", (q) =>
     `https://cut-dental.de/suggest?search=${searchParam(q)}`,
-    {
-      listedPriceIsNet: true,
-      vatIncludedInPrice: false,
-      sourceVatRate: 0.19,
-      minOrderNet: 50,
-      minOrderFeeNet: 5,
-      shippingNet: 7.95,
-      freeShippingFromNet: 250,
-      note: "Немски B2B. Цените са без ДДС; на касата се добавят 19% и надбавка под 50 €.",
-    }
+    deB2b
   ),
-  {
-    id: "dentalshop",
-    name: "DentalShop.bg",
-    url: "https://dentalshop.bg",
-    region: "BG",
-    publicShop: true,
-    vatIncludedInPrice: true,
-    iossLikely: false,
-    searchUrl: (query) => `https://dentalshop.bg/?s=${searchParam(query)}`,
-    note: "Български публичен магазин. Не всяка марка е на склад.",
-  },
-  {
-    id: "dentacon",
-    name: "Дентакон",
-    url: "https://shop.dentaconbg.com",
-    region: "BG",
-    publicShop: true,
-    vatIncludedInPrice: true,
-    iossLikely: false,
-    searchUrl: (query) =>
-      `https://shop.dentaconbg.com/index.php?route=product/search&search=${searchParam(query)}`,
-    note: "Българско дентално депо с публичен каталог.",
-  },
-  {
-    id: "dentaltix",
-    name: "Dentaltix",
-    url: "https://www.dentaltix.com/en",
-    region: "EU",
-    publicShop: true,
-    vatIncludedInPrice: true,
-    iossLikely: false,
-    searchUrl: (query) =>
-      `https://www.dentaltix.com/en/search?q=${searchParam(query)}`,
-    note: "Испански публичен склад. Доставка към България е вътрешнообщностна.",
-  },
-  {
-    id: "dentaldirect",
-    name: "Dental Direct ES",
-    url: "https://www.dentaldirect.es",
-    region: "EU",
-    publicShop: true,
-    vatIncludedInPrice: true,
-    iossLikely: false,
-    searchUrl: (query) =>
-      `https://www.dentaldirect.es/en/search?q=${searchParam(query)}`,
-    note: "Публичен ЕС магазин без B2B логин на входа.",
-  },
-  {
-    id: "amazonde",
-    name: "Amazon.de",
-    url: "https://www.amazon.de",
-    region: "EU",
-    publicShop: true,
-    vatIncludedInPrice: true,
-    iossLikely: false,
-    searchUrl: (query) =>
-      `https://www.amazon.de/s?k=${searchParam(`${query} dental`)}`,
-    note: "Публичен ЕС маркетплейс. Проверете продавача и доставката към BG.",
-  },
-  {
-    id: "alibaba",
-    name: "Alibaba",
-    url: "https://www.alibaba.com",
-    region: "INTL",
-    publicShop: true,
-    vatIncludedInPrice: false,
-    iossLikely: false,
-    searchUrl: (query) =>
-      `https://www.alibaba.com/trade/search?SearchText=${searchParam(query)}`,
-    note: "Извън ЕС. Обикновено B2B фактура — ДДС се дължи при внос.",
-  },
-  {
-    id: "aliexpress",
-    name: "AliExpress",
-    url: "https://www.aliexpress.com",
-    region: "INTL",
-    publicShop: true,
-    vatIncludedInPrice: true,
-    iossLikely: true,
-    searchUrl: (query) => aliexpressSearch(`${query} dental`),
-    note: "Извън ЕС. Често събира ДДС предварително (IOSS); мито и куриерска такса остават.",
-  },
-  {
-    id: "amazones",
-    name: "Amazon.es",
-    url: "https://www.amazon.es",
-    region: "EU",
-    publicShop: true,
-    vatIncludedInPrice: true,
-    iossLikely: false,
-    searchUrl: (query) =>
-      `https://www.amazon.es/s?k=${searchParam(`${query} dental`)}`,
-    note: "Публичен ЕС маркетплейс.",
-  },
-  {
-    id: "amazonfr",
-    name: "Amazon.fr",
-    url: "https://www.amazon.fr",
-    region: "EU",
-    publicShop: true,
-    vatIncludedInPrice: true,
-    iossLikely: false,
-    searchUrl: (query) =>
-      `https://www.amazon.fr/s?k=${searchParam(`${query} dental`)}`,
-    note: "Публичен ЕС маркетплейс.",
-  },
-  {
-    id: "ebayde",
-    name: "eBay.de",
-    url: "https://www.ebay.de",
-    region: "EU",
-    publicShop: true,
-    vatIncludedInPrice: true,
-    iossLikely: false,
-    searchUrl: (query) =>
-      `https://www.ebay.de/sch/i.html?_nkw=${searchParam(`${query} dental`)}`,
-    note: "Публичен ЕС маркетплейс. Проверете продавача.",
-  },
-  {
-    id: "promodentaire",
-    name: "Promo Dentaire",
-    url: "https://www.promo-dentaire.com",
-    region: "EU",
-    publicShop: true,
-    vatIncludedInPrice: true,
-    iossLikely: false,
-    searchUrl: (query) =>
-      `https://www.promo-dentaire.com/recherche?controller=search&s=${searchParam(query)}`,
-    note: "Френски дентален магазин. Доставка към BG е вътрешнообщностна.",
-  },
-  {
-    id: "dentaleshop",
-    name: "DentaleShop",
-    url: "https://www.dentaleshop.fr",
-    region: "EU",
-    publicShop: true,
-    vatIncludedInPrice: true,
-    iossLikely: false,
-    searchUrl: (query) =>
-      `https://www.dentaleshop.fr/recherche?controller=search&s=${searchParam(query)}`,
-    note: "Френски публичен каталог.",
-  },
-  {
-    id: "dentalsky",
-    name: "DentalSky",
-    url: "https://www.dentalsky.com",
-    region: "EU",
-    publicShop: true,
-    vatIncludedInPrice: true,
-    iossLikely: false,
-    searchUrl: (query) =>
-      `https://www.dentalsky.com/catalogsearch/result/?q=${searchParam(query)}`,
-    note: "UK/EU дентален магазин. Проверете доставката към BG.",
-  },
-  {
-    id: "ivoclarshop",
-    name: "Ivoclar Shop",
-    url: "https://www.ivoclar.com",
-    region: "EU",
-    publicShop: true,
-    vatIncludedInPrice: true,
-    iossLikely: false,
-    searchUrl: (query) =>
-      `https://www.ivoclar.com/en_gb/shop/search?q=${searchParam(query)}`,
-    note: "Официален Ivoclar магазин.",
-  },
-  {
-    id: "safco",
-    name: "Safco Dental",
-    url: "https://www.safcodental.com",
-    region: "INTL",
-    publicShop: true,
-    vatIncludedInPrice: false,
-    iossLikely: false,
-    searchUrl: (query) =>
-      `https://www.safcodental.com/catalogsearch/result/?q=${searchParam(query)}`,
-    note: "САЩ. При внос в ЕС се дължат ДДС и куриерска такса.",
-  },
-  {
-    id: "dentalsuperstore",
-    name: "The Dental Superstore",
-    url: "https://www.thedentalsuperstore.com",
-    region: "EU",
-    publicShop: true,
-    vatIncludedInPrice: true,
-    iossLikely: false,
-    searchUrl: (query) =>
-      `https://www.thedentalsuperstore.com/search?q=${searchParam(query)}`,
-    note: "UK/EU каталог. Проверете доставката към BG.",
-  },
+  shop("dentalshop", "DentalShop.bg", "https://dentalshop.bg", "BG", (q) =>
+    `https://dentalshop.bg/?s=${searchParam(q)}`
+  ),
+  shop("dentacon", "Дентакон", "https://shop.dentaconbg.com", "BG", (q) =>
+    `https://shop.dentaconbg.com/index.php?route=product/search&search=${searchParam(q)}`
+  ),
+  shop("medicplus", "Medicplus", "https://medicplus.bg", "BG", (q) =>
+    `https://medicplus.bg/?s=${searchParam(q)}`
+  ),
+  shop("denta", "Denta.bg", "https://denta.bg", "BG", (q) =>
+    `https://denta.bg/?s=${searchParam(q)}`
+  ),
+  shop("dentcommerce", "Dentcommerce", "https://www.dentcommerce.bg", "BG", (q) =>
+    `https://www.dentcommerce.bg/?s=${searchParam(q)}`
+  ),
+  shop("bgdent", "BG Dent", "https://www.bg-dent.com", "BG", (q) =>
+    `https://www.bg-dent.com/?s=${searchParam(q)}`
+  ),
+  shop("dentalsystem", "Dental System", "https://dentalsystem.bg", "BG", (q) =>
+    `https://dentalsystem.bg/?s=${searchParam(q)}`
+  ),
+  shop("stoma", "Stoma.bg", "https://www.stoma.bg", "BG", (q) =>
+    `https://www.stoma.bg/?s=${searchParam(q)}`
+  ),
+  shop(
+    "dentaldirect",
+    "Dental Direct ES",
+    "https://www.dentaldirect.es",
+    "EU",
+    (q) => `https://www.dentaldirect.es/en/search?q=${searchParam(q)}`
+  ),
+  shop("dentaltix", "Dentaltix", "https://www.dentaltix.com", "EU", (q) =>
+    `https://www.dentaltix.com/es/search?q=${searchParam(q)}`
+  ),
+  shop(
+    "promodentaire",
+    "Promo Dentaire",
+    "https://www.promo-dentaire.com",
+    "EU",
+    (q) =>
+      `https://www.promo-dentaire.com/recherche?controller=search&s=${searchParam(q)}`
+  ),
+  shop("dentaleshop", "DentaleShop", "https://www.dentaleshop.fr", "EU", (q) =>
+    `https://www.dentaleshop.fr/recherche?controller=search&s=${searchParam(q)}`
+  ),
+  shop("amazonde", "Amazon.de", "https://www.amazon.de", "EU", (q) =>
+    `https://www.amazon.de/s?k=${searchParam(`${q} dental`)}`
+  ),
   shop("temu", "Temu", "https://www.temu.com", "INTL", (q) =>
     `https://www.temu.com/search_result.html?search_key=${searchParam(`${q} dental`)}`,
     {
@@ -363,59 +207,6 @@ export const SUPPLIERS: Supplier[] = [
       iossLikely: true,
       note: "Извън ЕС. Често събира ДДС предварително; мито и куриер остават.",
     }
-  ),
-  shop("dhgate", "DHgate", "https://www.dhgate.com", "INTL", (q) =>
-    `https://www.dhgate.com/wholesale/search.do?searchkey=${searchParam(q)}`,
-    { vatIncludedInPrice: false }
-  ),
-  shop("amazonit", "Amazon.it", "https://www.amazon.it", "EU", (q) =>
-    `https://www.amazon.it/s?k=${searchParam(`${q} dental`)}`
-  ),
-  shop("ebayes", "eBay.es", "https://www.ebay.es", "EU", (q) =>
-    `https://www.ebay.es/sch/i.html?_nkw=${searchParam(`${q} dental`)}`
-  ),
-  shop("stoma", "Stoma.bg", "https://www.stoma.bg", "BG", (q) =>
-    `https://www.stoma.bg/?s=${searchParam(q)}`
-  ),
-  shop("dentamax", "Dentamax", "https://www.dentamax.bg", "BG", (q) =>
-    `https://www.dentamax.bg/?s=${searchParam(q)}`
-  ),
-  shop("denta", "Denta.bg", "https://denta.bg", "BG", (q) =>
-    `https://denta.bg/?s=${searchParam(q)}`
-  ),
-  shop("oraldent", "OralDent", "https://www.oraldent.bg", "BG", (q) =>
-    `https://www.oraldent.bg/?s=${searchParam(q)}`
-  ),
-  shop("dentalsystem", "Dental System", "https://dentalsystem.bg", "BG", (q) =>
-    `https://dentalsystem.bg/?s=${searchParam(q)}`
-  ),
-  shop("bgdent", "BG Dent", "https://www.bg-dent.com", "BG", (q) =>
-    `https://www.bg-dent.com/?s=${searchParam(q)}`
-  ),
-  shop("dentcommerce", "Dentcommerce", "https://www.dentcommerce.bg", "BG", (q) =>
-    `https://www.dentcommerce.bg/?s=${searchParam(q)}`
-  ),
-  shop("dentalplus", "Dental Plus", "https://www.dentalplus.bg", "BG", (q) =>
-    `https://www.dentalplus.bg/?s=${searchParam(q)}`
-  ),
-  shop("dentallife", "Dental Life", "https://www.dentallife.bg", "BG", (q) =>
-    `https://www.dentallife.bg/?s=${searchParam(q)}`
-  ),
-  shop("dentaldirectde", "Dental Direct DE", "https://www.dentaldirect.de", "EU", (q) =>
-    `https://www.dentaldirect.de/search?q=${searchParam(q)}`
-  ),
-  shop("ksdental", "KS Dental", "https://www.ks-dental.de", "EU", (q) =>
-    `https://www.ks-dental.de/search?sSearch=${searchParam(q)}`
-  ),
-  shop("dentalshopeu", "Dental-Shop.eu", "https://www.dental-shop.eu", "EU", (q) =>
-    `https://www.dental-shop.eu/search?q=${searchParam(q)}`
-  ),
-  shop("henryschein", "Henry Schein ES", "https://www.henryschein.es", "EU", (q) =>
-    `https://www.henryschein.es/es-es/Search.aspx?searchkey=${searchParam(q)}`
-  ),
-  shop("kerrdental", "Kerr Dental", "https://www.kerrdental.com", "EU", (q) =>
-    `https://www.kerrdental.com/search?q=${searchParam(q)}`,
-    { note: "Официален производител. Не винаги продава на дребно към BG." }
   ),
 ];
 

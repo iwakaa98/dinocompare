@@ -27,18 +27,7 @@ const cache = new Map<string, { expiresAt: number; value: LiveOfferResult }>();
 const CACHE_MS = 10 * 60 * 1000;
 const sitemapCache = new Map<string, { expiresAt: number; urls: string[] }>();
 const SITEMAP_MS = 30 * 60 * 1000;
-const MARKETPLACE_IDS = new Set([
-  "amazonde",
-  "amazones",
-  "amazonfr",
-  "amazonit",
-  "alibaba",
-  "aliexpress",
-  "ebayde",
-  "ebayes",
-  "temu",
-  "dhgate",
-]);
+const MARKETPLACE_IDS = new Set(["amazonde", "temu"]);
 const LEGACY_BGN_PER_EUR = 1.95583;
 
 const WEAK_TOKENS = /^(a[1-4]|b[1-4]|c[1-4]|d[1-4]|xt|ml|kit|the|and|for)$/i;
@@ -1178,30 +1167,16 @@ export async function fetchLiveOffers(query: string): Promise<LiveOfferResult> {
     });
   }
 
-  await take(specialty.slice(0, 6));
+  await take(specialty.slice(0, 8));
 
   const shopCount = () => new Set(hits.map((hit) => hostOf(hit.supplier))).size;
 
-  if (shopCount() < 3 && Date.now() - started < 10000) {
-    await take(specialty.slice(6, 12));
+  if (shopCount() < 6 && Date.now() - started < 12000) {
+    await take(specialty.slice(8));
   }
 
-  if (shopCount() < 3 && Date.now() - started < 14000) {
-    const knownHosts = new Set(hits.map((hit) => hostOf(hit.supplier)));
-    const extra = await withTimeout(discoverExtra(query, knownHosts), 5000);
-    if (extra) {
-      for (const hit of extra) {
-        const host = hostOf(hit.supplier);
-        if (knownHosts.has(host)) continue;
-        hits.push(hit);
-        foundIds.add(hit.supplier.id);
-        knownHosts.add(host);
-      }
-    }
-  }
-
-  if (shopCount() < 3 && Date.now() - started < 16000) {
-    await take([...specialty.slice(12, 18), ...markets.slice(0, 2)]);
+  if (shopCount() < 4 && Date.now() - started < 16000) {
+    await take(markets);
   }
 
   const unchecked: UncheckedShop[] = SUPPLIERS.filter(
