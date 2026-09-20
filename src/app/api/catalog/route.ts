@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getPopularCatalog } from "@/lib/search";
 
-export const revalidate = 420;
+export const dynamic = "force-dynamic";
 
 export async function GET() {
   const catalog = await getPopularCatalog();

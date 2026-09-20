@@ -3,6 +3,8 @@ import { hash } from "bcryptjs";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 
+export const dynamic = "force-dynamic";
+
 const schema = z.object({
   name: z.string().min(2, "Името трябва да е поне 2 символа"),
   email: z.string().email("Невалиден имейл"),

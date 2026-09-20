@@ -105,10 +105,15 @@ export async function runProductSearch(query: string): Promise<SearchResult> {
 }
 
 async function computePopularCatalog() {
-  const stats = await prisma.productStat.findMany({
-    orderBy: [{ searchCount: "desc" }, { lastSearched: "desc" }],
-    take: 8,
-  });
+  let stats: Awaited<ReturnType<typeof prisma.productStat.findMany>> = [];
+  try {
+    stats = await prisma.productStat.findMany({
+      orderBy: [{ searchCount: "desc" }, { lastSearched: "desc" }],
+      take: 8,
+    });
+  } catch {
+    stats = [];
+  }
 
   const source =
     stats.length === 0

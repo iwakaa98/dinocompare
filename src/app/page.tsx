@@ -5,6 +5,8 @@ import { SearchForm } from "@/components/search-form";
 import { SearchPanel } from "@/components/search-panel";
 import { getPopularCatalog } from "@/lib/search";
 
+export const dynamic = "force-dynamic";
+
 type HomeProps = {
   searchParams: Promise<{ q?: string }>;
 };
