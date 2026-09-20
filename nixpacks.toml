@@ -1,2 +1,11 @@
 [variables]
 NIXPACKS_NODE_VERSION = "20"
+NPM_CONFIG_PRODUCTION = "false"
+# Prisma generate runs during npm ci and must not require Railway secrets.
+DATABASE_URL = "postgresql://build:build@127.0.0.1:5432/build"
+
+[phases.setup]
+nixPkgs = ["nodejs_20", "openssl"]
+
+[phases.install]
+cmds = ["npm install -g npm@11.12.1", "npm ci --include=dev"]
