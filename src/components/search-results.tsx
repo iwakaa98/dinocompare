@@ -1,5 +1,10 @@
 import { ExternalLink, Package, Truck, Warehouse } from "lucide-react";
-import { remainingToFreeShipping, shopCheckoutInfo, type ProductOffer } from "@/lib/products";
+import {
+  remainingToFreeShipping,
+  shopCheckoutInfo,
+  shopInvoiceNote,
+  type ProductOffer,
+} from "@/lib/products";
 import { supplierById } from "@/lib/combo";
 import type { SearchResult } from "@/lib/search";
 import { formatEur } from "@/lib/utils";
@@ -124,6 +129,7 @@ function OfferRow({
         if (!supplier) return null;
         const checkout = shopCheckoutInfo(supplier);
         const remaining = remainingToFreeShipping(supplier, offer.price);
+        const invoiceNote = shopInvoiceNote(supplier);
         return (
           <div className="mt-3 space-y-1 text-xs leading-relaxed text-[var(--muted)]">
             {checkout.freeShippingFrom != null && (
@@ -137,12 +143,7 @@ function OfferRow({
                     : ""}
               </p>
             )}
-            {checkout.issuesEuInvoice && (
-              <p>
-                Издава фактура към българска фирма с ДДС номер (intra-EU reverse
-                charge). Регистрирайте кабинета в магазина преди поръчка.
-              </p>
-            )}
+            {invoiceNote && <p>{invoiceNote}</p>}
           </div>
         );
       })()}

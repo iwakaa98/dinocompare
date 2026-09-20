@@ -127,7 +127,7 @@ const deB2b = {
   shippingNet: 7.95,
   freeShippingFromNet: 250,
   issuesEuInvoice: true,
-  note: "Немски B2B. Издава фактура към българска фирма с ДДС номер (reverse charge). Цените са без ДДС.",
+  note: "Немски B2B. Фактура към фирма става с име, адрес и Булстат. Без ДДС номер касата слага 19%. Reverse charge е само с BG ДДС номер.",
 } as const;
 
 export const SUPPLIERS: Supplier[] = [
@@ -356,6 +356,11 @@ export function shopCheckoutInfo(supplier: Supplier) {
   };
 }
 
+export function shopInvoiceNote(supplier: Supplier) {
+  if (!supplier.issuesEuInvoice) return null;
+  return "Фактура към българска фирма: да, с име, адрес и Булстат/ЕИК. Без регистрация по ДДС касата слага 19% немски ДДС — така са сметнати и нашите суми. Reverse charge без този 19% става само с валиден BG ДДС номер в профила на магазина.";
+}
+
 export function remainingToFreeShipping(supplier: Supplier, goodsEur: number) {
   const info = shopCheckoutInfo(supplier);
   if (info.freeShippingFrom == null) return null;
@@ -469,7 +474,7 @@ export function quoteShipment(input: {
           ? `надбавка ${surcharge.toFixed(2)} € под ${supplier.minOrderNet} € нето`
           : null,
         `доставка ${shipping.toFixed(2)} € нето`,
-        `с EU ДДС номер често е reverse charge — без този 19% в касата`,
+        `без ДДС регистрация плащате този 19%; с BG ДДС номер често е reverse charge`,
       ]
         .filter(Boolean)
         .join(" · ")
