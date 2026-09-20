@@ -244,6 +244,31 @@ function dedupeHits(hits: LiveHit[]): LiveHit[] {
   return [...unique.values()];
 }
 
+function listingSlug(query: string): string {
+  return shopQuery(query)
+    .toLowerCase()
+    .trim()
+    .replace(/[^\p{L}\p{N}]+/gu, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+function isListingUrl(url: string, query: string): boolean {
+  try {
+    const last = decodeURIComponent(
+      new URL(url).pathname.split("/").filter(Boolean).pop() ?? ""
+    )
+      .replace(/\.html?$/i, "")
+      .toLowerCase();
+    if (!last) return true;
+    const slug = listingSlug(query);
+    if (slug && last === slug) return true;
+    const lastTokens = tokens(last.replace(/-/g, " "));
+    return lastTokens.length === 1 && last.length <= 18 && titleMatches(last, query);
+  } catch {
+    return false;
+  }
+}
+
 function isSearchUrl(url: string): boolean {
   return (
     /[?&](s|q|k|search|SearchText|searchText|query)=/i.test(url) ||
@@ -388,6 +413,31 @@ function stockNearUrl(html: string, url: string): boolean | null {
   return null;
 }
 
+function numbersFromOffer(value: unknown): number[] {
+  if (value == null) return [];
+  if (Array.isArray(value)) return value.flatMap(numbersFromOffer);
+  if (typeof value === "number" && Number.isFinite(value)) return [value];
+  if (typeof value === "string") {
+    const amount = parseMoney(value);
+    return amount ? [amount] : [];
+  }
+  if (typeof value !== "object") return [];
+  const row = value as Record<string, unknown>;
+  const out: number[] = [];
+  for (const key of ["lowPrice", "salePrice", "specialPrice", "price"]) {
+    out.push(...numbersFromOffer(row[key]));
+  }
+  if (row.priceSpecification) out.push(...numbersFromOffer(row.priceSpecification));
+  if (row.offers) out.push(...numbersFromOffer(row.offers));
+  return out;
+}
+
+function pickPayablePrice(values: number[]): number | null {
+  const prices = values.filter((value) => value >= 3 && value < 5000);
+  if (!prices.length) return null;
+  return Math.min(...prices);
+}
+
 function parseMoney(raw: string): number | null {
   const cleaned = raw.replace(/\s/g, "").replace(/[^\d,.]/g, "");
   if (!cleaned) return null;
@@ -529,7 +579,7 @@ async function searchWoo(
       priceEur: toEurAmount(raw / 10 ** minor, row.item.prices?.currency_code ?? "EUR"),
       inStock: row.item.is_in_stock !== false,
     });
-    if (hits.length >= 4) break;
+    if (hits.length >= 6) break;
   }
   return hits;
 }
@@ -779,7 +829,8 @@ function parseJsonLdProduct(
         const type = Array.isArray(node["@type"]) ? node["@type"].join(" ") : node["@type"];
         if (!String(type ?? "").toLowerCase().includes("product")) continue;
         const offer = Array.isArray(node.offers) ? node.offers[0] : node.offers;
-        const price = Number(offer?.price ?? offer?.lowPrice ?? node.offers?.price);
+        const prices = numbersFromOffer(node.offers ?? offer);
+        const price = pickPayablePrice(prices);
         if (!price) continue;
         return {
           title: node.name,
@@ -818,7 +869,40 @@ function parseMetaPrice(
   };
 }
 
+function parseSalePriceFromHtml(html: string): { price: number; currency: string } | null {
+  const patterns = [
+    /"lowPrice"\s*:\s*"?([0-9]+(?:[.,][0-9]+)?)/i,
+    /"sale_price"\s*:\s*"?([0-9]+(?:[.,][0-9]+)?)/i,
+    /"special_price"\s*:\s*"?([0-9]+(?:[.,][0-9]+)?)/i,
+    /data-(?:sale|special|promo)-price=["']([0-9]+(?:[.,][0-9]+)?)/i,
+    /class=["'][^"']*(?:special-price|sale-price|price-sales|promo-price|price--special|current-price)[^"']*["'][^>]*>[\s\S]{0,120}?([0-9]{1,4}[.,][0-9]{2})/i,
+  ];
+  for (const pattern of patterns) {
+    const match = html.match(pattern);
+    const price = match?.[1] ? parseMoney(match[1]) : null;
+    if (price && price >= 3 && price < 5000) return { price, currency: "EUR" };
+  }
+  const struck = html.match(
+    /(?:line-through|old-price|was-price|regular-price|price-old|precio-anterior)[^<]{0,160}([0-9]{1,4}[.,][0-9]{2})/i
+  );
+  if (struck?.[1]) {
+    const oldPrice = parseMoney(struck[1]);
+    const window = html.slice(
+      Math.max(0, html.search(struck[0])),
+      html.search(struck[0]) + 500
+    );
+    const next = window.match(/([0-9]{1,4}[.,][0-9]{2})\s*(?:€|&euro;|EUR)/i);
+    const sale = next?.[1] ? parseMoney(next[1]) : null;
+    if (oldPrice && sale && sale < oldPrice && sale >= 3) {
+      return { price: sale, currency: "EUR" };
+    }
+  }
+  return null;
+}
+
 function parseVisiblePrice(html: string): { price: number; currency: string } | null {
+  const sale = parseSalePriceFromHtml(html);
+  if (sale) return sale;
   const euro = html.match(/(?:€|&euro;)\s*([0-9]{1,4}(?:[.,][0-9]{2}))/);
   const euroAfter = html.match(/([0-9]{1,4}(?:[.,][0-9]{2}))\s*(?:€|&euro;|EUR)/i);
   const lev = html.match(/([0-9]{1,5}(?:[.,][0-9]{2}))\s*(?:лв\.?|BGN)/i);
@@ -841,16 +925,26 @@ async function hydrateFromProductPage(
   fallbackTitle: string,
   query: string
 ): Promise<LiveHit | null> {
-  if (isSearchUrl(url) || !isProductishUrl(url, hostOf(supplier))) return null;
-  const html = await fetchText(url, 5000);
+  if (isSearchUrl(url) || isListingUrl(url, query) || !isProductishUrl(url, hostOf(supplier))) {
+    return null;
+  }
+  const html = await fetchText(url, 4000);
   if (!html) return null;
   const jsonLd = parseJsonLdProduct(html);
   const meta = parseMetaPrice(html);
-  const visible = jsonLd?.price || meta?.price ? null : parseVisiblePrice(html);
+  const sale = parseSalePriceFromHtml(html);
+  const visible = jsonLd?.price || meta?.price || sale ? null : parseVisiblePrice(html);
   const title = decodeHtml(jsonLd?.title || meta?.title || fallbackTitle);
   if (looksWrongVariant(title, query)) return null;
   if (!titleMatches(title, query)) return null;
-  const price = jsonLd?.price || meta?.price || visible?.price;
+  const listed = jsonLd?.price || meta?.price || visible?.price;
+  const salePrice =
+    sale?.price && listed && sale.price < listed && sale.price >= listed * 0.2
+      ? sale.price
+      : sale?.price && !listed
+        ? sale.price
+        : null;
+  const price = salePrice || listed;
   if (!price) return null;
   const currency = jsonLd?.currency || meta?.currency || visible?.currency || "EUR";
   return {
@@ -924,6 +1018,7 @@ async function searchHtml(
         (link) =>
           isProductishUrl(link.href, host) &&
           !isSearchUrl(link.href) &&
+          !isListingUrl(link.href, matchQuery) &&
           !looksWrongVariant(link.title, matchQuery) &&
           !looksWrongVariant(titleFromHref(link.href), matchQuery) &&
           (link.score >= 0.28 || titleMatches(titleFromHref(link.href), matchQuery))
@@ -932,40 +1027,23 @@ async function searchHtml(
         const boost = (title: string) => dentistBoost(title, matchQuery);
         return boost(b.title) + b.score - (boost(a.title) + a.score);
       });
-    for (const link of links.slice(0, 4)) {
-      const key = link.href.replace(/\/+$/, "").toLowerCase();
-      if (seen.has(key)) continue;
-      const listed = priceNearUrl(html, link.href);
-      const listedStock = stockNearUrl(html, link.href);
-      if (
-        listed &&
-        listedStock !== null &&
-        (titleMatches(link.title, matchQuery) ||
-          titleMatches(titleFromHref(link.href), matchQuery))
-      ) {
-        seen.add(key);
-        hits.push({
-          supplier,
-          title: link.title,
-          url: link.href,
-          priceEur: listed,
-          inStock: listedStock,
-        });
-        if (hits.length >= 2) return hits;
-        continue;
-      }
-      const hit = await hydrateFromProductPage(
-        supplier,
-        link.href,
-        link.title,
-        matchQuery
-      );
+    const candidates = links
+      .filter((link) => !seen.has(link.href.replace(/\/+$/, "").toLowerCase()))
+      .slice(0, 8);
+    const hydrated = await Promise.all(
+      candidates.map((link) =>
+        hydrateFromProductPage(supplier, link.href, link.title, matchQuery)
+      )
+    );
+    for (const hit of hydrated) {
       if (!hit) continue;
-      seen.add(hit.url.replace(/\/+$/, "").toLowerCase());
+      const key = hit.url.replace(/\/+$/, "").toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
       hits.push(hit);
-      if (hits.length >= 2) return hits;
+      if (hits.length >= 6) return hits;
     }
-    if (hits.length >= 1) return hits;
+    if (hits.length >= 3) return hits;
   }
   return hits;
 }
@@ -1036,24 +1114,30 @@ async function collectSitemapUrls(supplier: Supplier): Promise<string[]> {
   return urls;
 }
 
-async function searchSitemap(supplier: Supplier, query: string): Promise<LiveHit | null> {
-  if (MARKETPLACE_IDS.has(supplier.id)) return null;
+async function searchSitemap(supplier: Supplier, query: string): Promise<LiveHit[]> {
+  if (MARKETPLACE_IDS.has(supplier.id)) return [];
   const host = hostOf(supplier);
   const urls = await collectSitemapUrls(supplier);
-  if (!urls.length) return null;
+  if (!urls.length) return [];
   const ranked = urls
     .map((url) => ({
       url,
       score: titleScore(decodeURIComponent(url.replace(/\+/g, " ")), query),
     }))
-    .filter((row) => row.score >= 0.28 && isProductishUrl(row.url, host) && !isSearchUrl(row.url))
+    .filter(
+      (row) =>
+        row.score >= 0.28 &&
+        isProductishUrl(row.url, host) &&
+        !isSearchUrl(row.url) &&
+        !isListingUrl(row.url, query)
+    )
     .sort((a, b) => b.score - a.score);
 
-  for (const row of ranked.slice(0, 4)) {
-    const hit = await hydrateFromProductPage(supplier, row.url, row.url, query);
-    if (hit) return hit;
-  }
-  return null;
+  const picked = ranked.slice(0, 8);
+  const hydrated = await Promise.all(
+    picked.map((row) => hydrateFromProductPage(supplier, row.url, row.url, query))
+  );
+  return hydrated.filter((hit): hit is LiveHit => Boolean(hit)).slice(0, 6);
 }
 
 async function searchWebIndex(supplier: Supplier, query: string): Promise<LiveHit | null> {
@@ -1113,15 +1197,14 @@ async function searchFast(supplier: Supplier, query: string): Promise<LiveHit[]>
       const collected: LiveHit[] = [];
       for (const q of queries) {
         collected.push(...(await searchWoo(supplier, q, query)));
-        if (collected.length >= 2) break;
+        if (collected.length >= 6) break;
         collected.push(...(await searchHtml(supplier, q, query)));
-        if (collected.length >= 1) break;
+        if (collected.length >= 3) break;
       }
-      if (!collected.length) {
-        const mapped = await searchSitemap(supplier, query);
-        if (mapped) collected.push(mapped);
+      if (collected.length < 3) {
+        collected.push(...(await searchSitemap(supplier, query)));
       }
-      return dedupeHits(collected).slice(0, 3);
+      return dedupeHits(collected).slice(0, 6);
     })(),
     9000
   );
@@ -1133,7 +1216,7 @@ async function searchSlow(supplier: Supplier, query: string): Promise<LiveHit | 
     (async () => {
       const web = await searchWebIndex(supplier, query);
       if (web) return web;
-      return searchSitemap(supplier, query);
+      return (await searchSitemap(supplier, query))[0] ?? null;
     })(),
     10000
   );
@@ -1298,7 +1381,7 @@ function toOffer(hit: LiveHit): ProductOffer {
 }
 
 export async function fetchLiveOffers(query: string): Promise<LiveOfferResult> {
-  const key = `eur-v11:${query.trim().toLowerCase()}`;
+  const key = `eur-v12:${query.trim().toLowerCase()}`;
   const now = Date.now();
   const cached = cache.get(key);
   if (cached && cached.expiresAt > now) return cached.value;
@@ -1373,7 +1456,7 @@ export async function fetchLiveOffers(query: string): Promise<LiveOfferResult> {
       if (Math.abs(boost) > 0.2) return boost;
       return a.total - b.total;
     })
-    .slice(0, 16);
+    .slice(0, 28);
   const stocked = offers.filter((offer) => offer.inStock);
   const compareAgainst = stocked.length ? stocked : offers;
   const worst = compareAgainst[compareAgainst.length - 1]?.total ?? 0;
