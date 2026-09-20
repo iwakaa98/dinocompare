@@ -38,6 +38,11 @@ const TOKEN_SYNONYMS: Record<string, string[]> = {
   supreme: ["supreme", "z350", "ultimate"],
   septanest: ["septanest", "септанест"],
   септанест: ["септанест", "septanest"],
+  tokuyama: ["tokuyama", "токуяма", "estelite", "естелайт", "estelait"],
+  токуяма: ["токуяма", "tokuyama", "estelite", "естелайт"],
+  estelite: ["estelite", "tokuyama", "естелайт", "estelait", "asteria"],
+  естелайт: ["естелайт", "estelite", "tokuyama", "estelait"],
+  estelait: ["estelait", "estelite", "естелайт", "tokuyama"],
 };
 
 function tokens(query: string): string[] {
@@ -70,14 +75,47 @@ const CYRILLIC_SHOP_ALIASES: Record<string, string> = {
   septanest: "Септанест",
   scandonest: "Скандонест",
   filtek: "Филтек",
+  tokuyama: "Токуяма",
+  estelite: "Естелайт",
 };
 
 function shopQueries(query: string): string[] {
   const primary = shopQuery(query);
-  const extras = tokens(query)
-    .map((token) => CYRILLIC_SHOP_ALIASES[token])
-    .filter((value): value is string => Boolean(value));
+  const extras: string[] = [];
+  for (const token of tokens(query)) {
+    const cyrillic = CYRILLIC_SHOP_ALIASES[token];
+    if (cyrillic) extras.push(cyrillic);
+    const synonym = (TOKEN_SYNONYMS[token] ?? []).find((item) => item !== token);
+    if (synonym) extras.push(synonym);
+  }
   return [...new Set([primary, ...extras].map((value) => value.trim()).filter(Boolean))];
+}
+
+function editDistance(a: string, b: string): number {
+  if (a === b) return 0;
+  if (Math.abs(a.length - b.length) > 2) return 99;
+  const rows = a.length + 1;
+  const cols = b.length + 1;
+  const prev = new Array<number>(cols);
+  const curr = new Array<number>(cols);
+  for (let j = 0; j < cols; j++) prev[j] = j;
+  for (let i = 1; i < rows; i++) {
+    curr[0] = i;
+    for (let j = 1; j < cols; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      curr[j] = Math.min(prev[j] + 1, curr[j - 1] + 1, prev[j - 1] + cost);
+    }
+    for (let j = 0; j < cols; j++) prev[j] = curr[j];
+  }
+  return prev[b.length];
+}
+
+function fuzzyTokenHit(hay: string, part: string): boolean {
+  if (part.length < 5) return false;
+  const allowed = part.length >= 8 ? 2 : 1;
+  return tokens(hay).some(
+    (token) => token.length >= 4 && editDistance(token, part) <= allowed
+  );
 }
 
 function tokenHits(hay: string, part: string): boolean {
@@ -87,7 +125,8 @@ function tokenHits(hay: string, part: string): boolean {
     );
   }
   if (hay.includes(part)) return true;
-  return (TOKEN_SYNONYMS[part] ?? []).some((alt) => hay.includes(alt));
+  if ((TOKEN_SYNONYMS[part] ?? []).some((alt) => hay.includes(alt))) return true;
+  return fuzzyTokenHit(hay, part);
 }
 
 function adrenalineRatio(value: string): "100000" | "200000" | null {
@@ -114,7 +153,13 @@ function looksLikeAnestheticPack(title: string): boolean {
 function looksWrongVariant(title: string, query: string): boolean {
   const t = title.toLowerCase();
   const q = query.toLowerCase();
-  if (/\bflow\b|флоу/.test(t) && !/\bflow\b|флоу/.test(q)) return true;
+  if (
+    tokens(q).length > 1 &&
+    /\bflow\b|флоу/.test(t) &&
+    !/\bflow\b|флоу/.test(q)
+  ) {
+    return true;
+  }
   if (/\bmini body\b/.test(t) && !/\bmini body\b/.test(q)) return true;
   const anestheticQuery = /septanest|септанест|scandonest|арти\s*каин|артикаин|анестез/.test(
     q
@@ -824,6 +869,11 @@ async function hydrateFromProductPage(
 function shopSearchCandidates(supplier: Supplier, query: string): string[] {
   const origin = new URL(supplier.url).origin;
   const q = encodeURIComponent(query);
+  const slug = query
+    .toLowerCase()
+    .trim()
+    .replace(/[^\p{L}\p{N}]+/gu, "-")
+    .replace(/^-+|-+$/g, "");
   const extras = [
     supplier.searchUrl(query),
     `${origin}/suggest?search=${q}`,
@@ -837,8 +887,10 @@ function shopSearchCandidates(supplier: Supplier, query: string): string[] {
     `${origin}/cautare?s=${q}`,
     `${origin}/search?controller=search&s=${q}`,
     `${origin}/index.php?route=product/search&search=${q}`,
+    slug ? `${origin}/${slug}.html` : "",
+    slug ? `${origin}/${slug}` : "",
   ];
-  return [...new Set(extras)];
+  return [...new Set(extras.filter(Boolean))];
 }
 
 async function searchHtml(
@@ -994,7 +1046,7 @@ async function searchSitemap(supplier: Supplier, query: string): Promise<LiveHit
       url,
       score: titleScore(decodeURIComponent(url.replace(/\+/g, " ")), query),
     }))
-    .filter((row) => row.score >= 0.5 && isProductishUrl(row.url, host) && !isSearchUrl(row.url))
+    .filter((row) => row.score >= 0.28 && isProductishUrl(row.url, host) && !isSearchUrl(row.url))
     .sort((a, b) => b.score - a.score);
 
   for (const row of ranked.slice(0, 4)) {
@@ -1065,9 +1117,13 @@ async function searchFast(supplier: Supplier, query: string): Promise<LiveHit[]>
         collected.push(...(await searchHtml(supplier, q, query)));
         if (collected.length >= 1) break;
       }
+      if (!collected.length) {
+        const mapped = await searchSitemap(supplier, query);
+        if (mapped) collected.push(mapped);
+      }
       return dedupeHits(collected).slice(0, 3);
     })(),
-    8000
+    9000
   );
   return found ?? [];
 }
@@ -1133,7 +1189,7 @@ function looksUsefulShop(url: string): boolean {
     ) {
       return true;
     }
-    return /dent|stoma|kerr|ivoclar|3m|gc\.|amazon|ebay|alibaba|aliexpress|temu|medic|patricia|henry|schein|safco|promo|oral|dhgate|medident/i.test(
+    return /dent|stoma|kerr|ivoclar|3m|gc\.|amazon|ebay|alibaba|aliexpress|temu|medic|patricia|henry|schein|safco|promo|oral|dhgate|medident|belvezar|tokuyama|estelite/i.test(
       host
     );
   } catch {
@@ -1242,7 +1298,7 @@ function toOffer(hit: LiveHit): ProductOffer {
 }
 
 export async function fetchLiveOffers(query: string): Promise<LiveOfferResult> {
-  const key = `eur-v10:${query.trim().toLowerCase()}`;
+  const key = `eur-v11:${query.trim().toLowerCase()}`;
   const now = Date.now();
   const cached = cache.get(key);
   if (cached && cached.expiresAt > now) return cached.value;
@@ -1279,6 +1335,20 @@ export async function fetchLiveOffers(query: string): Promise<LiveOfferResult> {
 
   if (shopCount() < 4 && Date.now() - started < 16000) {
     await take(markets);
+  }
+
+  if (shopCount() < 3 && Date.now() - started < 20000) {
+    const extra = await withTimeout(
+      discoverExtra(
+        query,
+        new Set(hits.map((hit) => hostOf(hit.supplier)))
+      ),
+      8000
+    );
+    if (extra?.length) {
+      hits.push(...extra);
+      extra.forEach((hit) => foundIds.add(hit.supplier.id));
+    }
   }
 
   const unchecked: UncheckedShop[] = SUPPLIERS.filter(

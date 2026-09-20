@@ -154,6 +154,14 @@ export const SUPPLIERS: Supplier[] = [
   shop("veamed", "Veamed", "https://www.veamed.bg", "BG", (q) =>
     `https://www.veamed.bg/?s=${searchParam(q)}`
   ),
+  shop("belvezar", "Belvezar", "https://www.belvezar.com", "BG", (q) => {
+    const slug = q
+      .toLowerCase()
+      .trim()
+      .replace(/[^\p{L}\p{N}]+/gu, "-")
+      .replace(/^-+|-+$/g, "");
+    return `https://www.belvezar.com/${slug || searchParam(q)}.html`;
+  }),
   shop(
     "klapperzaehnchen",
     "Klapperzähnchen",
@@ -245,6 +253,26 @@ export const CATALOG: CatalogProduct[] = [
       "Нанокомпозит Filtek. В ЕС често се продава като Filtek Ultimate / Supreme XT.",
     aliases: ["filtek", "z350", "3m filtek", "филтек", "filtek ultimate"],
     searchQuery: "Filtek Ultimate A2",
+  },
+  {
+    slug: "tokuyama-estelite-asteria",
+    name: "Tokuyama Estelite Asteria",
+    brand: "Tokuyama",
+    category: "Композити",
+    unit: "спринцовка / сет",
+    description:
+      "Нанокомпозит Estelite Asteria. Търсенето „Tokuyama“ показва и Sigma Quick и други линии.",
+    aliases: [
+      "tokuyama",
+      "токуяма",
+      "estelite",
+      "естелайт",
+      "estelait",
+      "asteria",
+      "астерия",
+      "sigma quick",
+    ],
+    searchQuery: "Tokuyama",
   },
   {
     slug: "optibond-fl",
