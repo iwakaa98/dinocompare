@@ -1,8 +1,7 @@
 import { Calculator, Layers3, ShieldCheck, TimerReset } from "lucide-react";
-import { ComboPlanner } from "@/components/combo-planner";
+import { CompareWorkspace } from "@/components/compare-workspace";
 import { PopularCatalog } from "@/components/popular-catalog";
 import { SearchForm } from "@/components/search-form";
-import { SearchPanel } from "@/components/search-panel";
 import { getPopularCatalog } from "@/lib/search";
 
 export const dynamic = "force-dynamic";
@@ -49,15 +48,7 @@ export default async function HomePage({ searchParams }: HomeProps) {
         </div>
       </section>
 
-      {query && (
-        <section className="mx-auto max-w-6xl px-4 pb-16 sm:px-6">
-          <SearchPanel query={query} />
-        </section>
-      )}
-
-      <section className="mx-auto max-w-3xl px-4 pb-12 sm:px-6">
-        <ComboPlanner />
-      </section>
+      <CompareWorkspace query={query} />
 
       <section className="mx-auto max-w-6xl px-4 pb-20 sm:px-6">
         <PopularCatalog

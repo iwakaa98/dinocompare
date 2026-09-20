@@ -1,5 +1,6 @@
 import { ExternalLink, Package, Truck, Warehouse } from "lucide-react";
-import type { ProductOffer } from "@/lib/products";
+import { remainingToFreeShipping, shopCheckoutInfo, type ProductOffer } from "@/lib/products";
+import { supplierById } from "@/lib/combo";
 import type { SearchResult } from "@/lib/search";
 import { formatEur } from "@/lib/utils";
 import { AddToComboButton } from "@/components/add-to-combo-button";
@@ -118,6 +119,33 @@ function OfferRow({
       <p className="mt-2 text-xs leading-relaxed text-[var(--muted)]">
         {offer.customsNote}
       </p>
+      {(() => {
+        const supplier = supplierById(offer.supplierId);
+        if (!supplier) return null;
+        const checkout = shopCheckoutInfo(supplier);
+        const remaining = remainingToFreeShipping(supplier, offer.price);
+        return (
+          <div className="mt-3 space-y-1 text-xs leading-relaxed text-[var(--muted)]">
+            {checkout.freeShippingFrom != null && (
+              <p>
+                Безплатна доставка от {checkout.freeShippingFrom} €
+                {checkout.freeShippingIsNet ? " нето" : ""}
+                {remaining && remaining > 0
+                  ? ` · още ${formatEur(remaining)} до прага`
+                  : remaining === 0
+                    ? " · прагът е покрит"
+                    : ""}
+              </p>
+            )}
+            {checkout.issuesEuInvoice && (
+              <p>
+                Издава фактура към българска фирма с ДДС номер (intra-EU reverse
+                charge). Регистрирайте кабинета в магазина преди поръчка.
+              </p>
+            )}
+          </div>
+        );
+      })()}
 
       <div className="mt-5 flex flex-wrap items-center gap-3">
         <a

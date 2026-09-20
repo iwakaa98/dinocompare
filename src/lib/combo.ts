@@ -1,5 +1,6 @@
 import {
-  BG_FREE_SHIPPING_FROM,
+  remainingToFreeShipping,
+  shopCheckoutInfo,
   SUPPLIERS,
   quoteShipment,
   round2,
@@ -38,6 +39,10 @@ export type ComboQuote = {
   combinedTotal: number;
   saved: number;
   reasons: string[];
+  freeShippingFrom: number | null;
+  remainingToFree: number | null;
+  freeShippingIsNet: boolean;
+  issuesEuInvoice: boolean;
 };
 
 export function supplierById(id: string): Supplier | undefined {
@@ -179,12 +184,20 @@ export function quoteComboGroups(items: ComboItem[]): ComboQuote[] {
           ).toFixed(2)}`
         );
       }
-      if (
-        supplier.region === "BG" &&
-        goods >= BG_FREE_SHIPPING_FROM &&
-        group.some((item) => item.price < BG_FREE_SHIPPING_FROM)
-      ) {
-        reasons.push("прагът за безплатна доставка в BG се покрива от общата сума");
+      const checkout = shopCheckoutInfo(supplier);
+      const remainingToFree = remainingToFreeShipping(supplier, goods);
+      if (remainingToFree === 0 && checkout.freeShippingFrom) {
+        reasons.push(
+          `прагът за безплатна доставка (${checkout.freeShippingFrom} €${
+            checkout.freeShippingIsNet ? " нето" : ""
+          }) е покрит`
+        );
+      } else if (remainingToFree && remainingToFree > 0) {
+        reasons.push(
+          `още ${remainingToFree.toFixed(2)} € до безплатна доставка (от ${
+            checkout.freeShippingFrom
+          } €${checkout.freeShippingIsNet ? " нето" : ""})`
+        );
       }
 
       return {
@@ -201,6 +214,10 @@ export function quoteComboGroups(items: ComboItem[]): ComboQuote[] {
         combinedTotal: combined.total,
         saved,
         reasons,
+        freeShippingFrom: checkout.freeShippingFrom,
+        remainingToFree,
+        freeShippingIsNet: checkout.freeShippingIsNet,
+        issuesEuInvoice: checkout.issuesEuInvoice,
       };
     })
     .filter((row): row is ComboQuote => Boolean(row))

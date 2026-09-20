@@ -15,6 +15,7 @@ export type Supplier = {
   minOrderFeeNet?: number;
   shippingNet?: number;
   freeShippingFromNet?: number;
+  issuesEuInvoice?: boolean;
   searchUrl: (query: string) => string;
   note: string;
 };
@@ -105,6 +106,7 @@ function shop(
     minOrderFeeNet: extra?.minOrderFeeNet,
     shippingNet: extra?.shippingNet,
     freeShippingFromNet: extra?.freeShippingFromNet,
+    issuesEuInvoice: extra?.issuesEuInvoice,
     searchUrl,
     note:
       extra?.note ??
@@ -124,7 +126,8 @@ const deB2b = {
   minOrderFeeNet: 5,
   shippingNet: 7.95,
   freeShippingFromNet: 250,
-  note: "Немски B2B. Цените са без ДДС; на касата се добавят 19% и надбавка под 50 €.",
+  issuesEuInvoice: true,
+  note: "Немски B2B. Издава фактура към българска фирма с ДДС номер (reverse charge). Цените са без ДДС.",
 } as const;
 
 export const SUPPLIERS: Supplier[] = [
@@ -341,6 +344,23 @@ export const CATALOG: CatalogProduct[] = [
     searchQuery: "Meta Biomed Metapaste",
   },
 ];
+
+export function shopCheckoutInfo(supplier: Supplier) {
+  const from =
+    supplier.freeShippingFromNet ??
+    (supplier.region === "BG" ? BG_FREE_SHIPPING_FROM : null);
+  return {
+    freeShippingFrom: from,
+    freeShippingIsNet: Boolean(supplier.freeShippingFromNet) || supplier.region === "BG",
+    issuesEuInvoice: Boolean(supplier.issuesEuInvoice),
+  };
+}
+
+export function remainingToFreeShipping(supplier: Supplier, goodsEur: number) {
+  const info = shopCheckoutInfo(supplier);
+  if (info.freeShippingFrom == null) return null;
+  return round2(Math.max(0, info.freeShippingFrom - goodsEur));
+}
 
 export function round2(n: number): number {
   return Math.round(n * 100) / 100;

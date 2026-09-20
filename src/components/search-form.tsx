@@ -24,7 +24,7 @@ export function SearchForm({
     const q = query.trim();
     if (!q) return;
     startTransition(() => {
-      router.push(`/?q=${encodeURIComponent(q)}`);
+      router.push(`/?q=${encodeURIComponent(q)}#results`);
     });
   }
 

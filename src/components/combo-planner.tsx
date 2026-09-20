@@ -145,6 +145,28 @@ export function ComboPlanner() {
                   <dd>{formatEur(quote.combinedTotal)}</dd>
                 </div>
               </dl>
+              {quote.freeShippingFrom != null && (
+                <p className="mt-3 rounded-xl bg-[var(--surface)] px-3 py-2 text-xs text-[var(--ink)]">
+                  {quote.combinedShipping === 0
+                    ? `Безплатна доставка: прагът от ${quote.freeShippingFrom} €${
+                        quote.freeShippingIsNet ? " нето" : ""
+                      } е покрит.`
+                    : `Безплатна доставка от ${quote.freeShippingFrom} €${
+                        quote.freeShippingIsNet ? " нето" : ""
+                      }${
+                        quote.remainingToFree
+                          ? ` · добавете още ${formatEur(quote.remainingToFree)}`
+                          : ""
+                      }`}
+                </p>
+              )}
+              {quote.issuesEuInvoice && (
+                <p className="mt-2 text-xs text-[var(--muted)]">
+                  Този магазин издава фактура към българска фирма с ДДС номер.
+                  Въведете BG ДДС номера в профила на сайта, за да е reverse
+                  charge вместо 19% немски ДДС.
+                </p>
+              )}
               {quote.saved > 0.5 && (
                 <p className="mt-2 text-xs text-[var(--accent)]">
                   Срещу отделни пратки спестявате {formatEur(quote.saved)}.

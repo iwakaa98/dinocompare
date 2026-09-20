@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import { Fraunces, Manrope } from "next/font/google";
 import { AuthProvider } from "@/components/auth-provider";
 import { SiteHeader } from "@/components/site-header";
@@ -28,7 +29,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     >
       <body className="min-h-full flex flex-col font-[family-name:var(--font-body)]">
         <AuthProvider>
-          <SiteHeader />
+          <Suspense fallback={<div className="h-16 border-b border-[var(--line)]/70" />}>
+            <SiteHeader />
+          </Suspense>
           <main className="flex-1">{children}</main>
           <footer className="border-t border-[var(--line)]/80 py-8 text-center text-sm text-[var(--muted)]">
             <div className="mx-auto max-w-6xl px-4">

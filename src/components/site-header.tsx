@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { signOut, useSession } from "next-auth/react";
 import { useEffect, useRef, useState } from "react";
 import { Clock3, LogOut, Menu, Search, X } from "lucide-react";
@@ -17,6 +17,10 @@ type RecentItem = {
 export function SiteHeader() {
   const { data: session } = useSession();
   const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const q = searchParams.get("q");
+  const withQuery = (hash: string) =>
+    q ? `/?q=${encodeURIComponent(q)}${hash}` : `/${hash}`;
   const [openRecent, setOpenRecent] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [recent, setRecent] = useState<RecentItem[]>([]);
@@ -65,19 +69,19 @@ export function SiteHeader() {
 
         <nav className="hidden items-center gap-1 md:flex">
           <Link
-            href="/#catalog"
+            href={withQuery("#catalog")}
             className="rounded-lg px-3 py-2 text-sm text-[var(--muted)] transition hover:bg-[var(--surface)] hover:text-[var(--ink)]"
           >
             Каталог
           </Link>
           <Link
-            href="/#combo"
+            href={withQuery("#combo")}
             className="rounded-lg px-3 py-2 text-sm text-[var(--muted)] transition hover:bg-[var(--surface)] hover:text-[var(--ink)]"
           >
             Комбинирай
           </Link>
           <Link
-            href="/#how"
+            href={withQuery("#how")}
             className="rounded-lg px-3 py-2 text-sm text-[var(--muted)] transition hover:bg-[var(--surface)] hover:text-[var(--ink)]"
           >
             Как работи
@@ -190,13 +194,13 @@ export function SiteHeader() {
       {mobileOpen && (
         <div className="border-t border-[var(--line)] bg-[var(--bg)] px-4 py-4 md:hidden">
           <div className="flex flex-col gap-1">
-            <Link href="/#catalog" className="rounded-lg px-3 py-2 text-sm">
+            <Link href={withQuery("#catalog")} className="rounded-lg px-3 py-2 text-sm">
               Каталог
             </Link>
-            <Link href="/#combo" className="rounded-lg px-3 py-2 text-sm">
+            <Link href={withQuery("#combo")} className="rounded-lg px-3 py-2 text-sm">
               Комбинирай
             </Link>
-            <Link href="/#how" className="rounded-lg px-3 py-2 text-sm">
+            <Link href={withQuery("#how")} className="rounded-lg px-3 py-2 text-sm">
               Как работи
             </Link>
             {session?.user ? (
