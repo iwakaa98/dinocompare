@@ -26,19 +26,26 @@ function OfferRow({
   rank: number;
   product: SearchResult["product"];
 }) {
-  const isBest = rank === 1;
+  const isBest = rank === 1 && offer.inStock;
 
   return (
     <article
       className={`relative overflow-hidden rounded-3xl border p-5 sm:p-6 ${
-        isBest
-          ? "border-[var(--accent)] bg-gradient-to-br from-white to-[var(--accent-soft)] shadow-[0_18px_50px_rgba(15,118,110,0.12)]"
-          : "border-[var(--line)] bg-white/80"
+        !offer.inStock
+          ? "border-amber-300/80 bg-amber-50/50"
+          : isBest
+            ? "border-[var(--accent)] bg-gradient-to-br from-white to-[var(--accent-soft)] shadow-[0_18px_50px_rgba(15,118,110,0.12)]"
+            : "border-[var(--line)] bg-white/80"
       }`}
     >
       {isBest && (
         <p className="mb-3 inline-flex rounded-full bg-[var(--accent)] px-3 py-1 text-xs font-semibold tracking-wide text-white">
           Най-изгодна потвърдена оферта
+        </p>
+      )}
+      {!offer.inStock && (
+        <p className="mb-3 inline-flex rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold tracking-wide text-amber-900">
+          Не е наличен в момента
         </p>
       )}
 
@@ -62,6 +69,11 @@ function OfferRow({
           <p className="font-[family-name:var(--font-display)] text-3xl text-[var(--accent-deep)]">
             {formatEur(offer.total)}
           </p>
+          {!offer.inStock && (
+            <p className="mt-1 text-xs font-medium text-amber-800">
+              Цената е от сайта, но продуктът е изчерпан там
+            </p>
+          )}
           {offer.savingsVsWorst && offer.savingsVsWorst > 1 && (
             <p className="mt-1 text-xs font-medium text-[var(--accent)]">
               до {formatEur(offer.savingsVsWorst)} по-изгодно от най-скъпата оферта
@@ -225,9 +237,9 @@ export function SearchResults({ result }: { result: SearchResult }) {
           {result.product.name}
         </h2>
         <p className="mt-2 max-w-2xl text-[var(--muted)]">
-          {result.product.brand} · {result.product.category}. Показваме всички
-          намерени варианти с потвърдена цена. Най-адекватните за кабинета са
-          отгоре, после по крайна цена.
+          {result.product.brand} · {result.product.category}. Показваме
+          намерените варианти с потвърдена цена. Наличните са отгоре; изчерпаните
+          остават видими, но не се броят за най-евтини.
         </p>
         <p className="mt-2 text-xs leading-relaxed text-[var(--muted)]">
           {result.priceDisclaimer}

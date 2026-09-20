@@ -16,6 +16,7 @@ type LiveHit = {
   title: string;
   url: string;
   priceEur: number;
+  inStock: boolean;
 };
 
 export type LiveOfferResult = {
@@ -256,6 +257,84 @@ function toEurAmount(amount: number, currency: string): number {
   return round2(amount);
 }
 
+function availabilityFromValue(value: unknown): boolean | null {
+  if (value === true || value === 1) return true;
+  if (value === false || value === 0) return false;
+  if (typeof value === "number") return value > 0 ? true : value === 0 ? false : null;
+  if (typeof value !== "string") return null;
+  const hay = value.toLowerCase().replace(/https?:\/\/schema\.org\//g, "");
+  if (
+    /outofstock|out[\s_-]?of[\s_-]?stock|sold[\s_-]?out|discontinued|unavailable|notavailable|nicht[\s_-]?lieferbar|nicht[\s_-]?verf(?:ü|u)gbar|ausverkauft|изчерпан|няма[\s_-]?наличност|agotado|sin[\s_-]?stock/.test(
+      hay
+    )
+  ) {
+    return false;
+  }
+  if (
+    /instock|in[\s_-]?stock|limitedavailability|preorder|pre[\s_-]?order|backorder|lieferbar|available|налич/.test(
+      hay
+    )
+  ) {
+    return true;
+  }
+  return null;
+}
+
+function parseHtmlAvailability(html: string): boolean | null {
+  const patterns = [
+    /itemprop=["']availability["'][^>]*(?:href|content)=["']([^"']+)/i,
+    /(?:href|content)=["']([^"']+)["'][^>]*itemprop=["']availability["']/i,
+    /property=["']og:availability["'][^>]+content=["']([^"']+)/i,
+    /"availability"\s*:\s*"([^"]+)"/i,
+    /"stock_status"\s*:\s*"([^"]+)"/i,
+    /"is_in_stock"\s*:\s*(true|false)/i,
+    /"available"\s*:\s*(true|false)/i,
+  ];
+  for (const pattern of patterns) {
+    const match = html.match(pattern);
+    if (!match) continue;
+    const parsed = availabilityFromValue(match[1]);
+    if (parsed !== null) return parsed;
+  }
+  const bodyClass = html.match(/<body[^>]*class=["']([^"']+)/i)?.[1] ?? "";
+  if (/\b(?:outofstock|out-of-stock|sold-out|unavailable)\b/i.test(bodyClass)) {
+    return false;
+  }
+  return null;
+}
+
+function stockFromNearbyText(html: string): boolean | null {
+  const structured = parseHtmlAvailability(html);
+  if (structured !== null) return structured;
+  if (
+    /изчерпан|няма наличност|не е наличен|nicht lieferbar|nicht verfügbar|ausverkauft|agotado|sold out|out of stock|currently unavailable/i.test(
+      html
+    )
+  ) {
+    return false;
+  }
+  return null;
+}
+
+function stockNearUrl(html: string, url: string): boolean | null {
+  const needles = [url];
+  try {
+    const parsed = new URL(url);
+    needles.push(parsed.pathname, parsed.pathname.replace(/^\//, ""));
+  } catch {
+    /* ignore */
+  }
+  for (const needle of needles) {
+    const idx = html.indexOf(needle);
+    if (idx < 0) continue;
+    const parsed = stockFromNearbyText(
+      html.slice(Math.max(0, idx - 240), idx + 900)
+    );
+    if (parsed !== null) return parsed;
+  }
+  return null;
+}
+
 function parseMoney(raw: string): number | null {
   const cleaned = raw.replace(/\s/g, "").replace(/[^\d,.]/g, "");
   if (!cleaned) return null;
@@ -352,6 +431,8 @@ async function searchWoo(
   let items: Array<{
     name?: string;
     permalink?: string;
+    is_in_stock?: boolean;
+    is_purchasable?: boolean;
     prices?: {
       price?: string;
       sale_price?: string;
@@ -393,6 +474,7 @@ async function searchWoo(
       title: row.item.name ?? query,
       url: row.item.permalink,
       priceEur: toEurAmount(raw / 10 ** minor, row.item.prices?.currency_code ?? "EUR"),
+      inStock: row.item.is_in_stock !== false,
     });
     if (hits.length >= 4) break;
   }
@@ -415,7 +497,7 @@ async function searchShopifyCatalog(
         products?: Array<{
           title?: string;
           handle?: string;
-          variants?: Array<{ price?: string }>;
+          variants?: Array<{ price?: string; available?: boolean }>;
         }>;
       };
       const products = data.products ?? [];
@@ -441,6 +523,7 @@ async function searchShopifyCatalog(
           title: best.title ?? query,
           url: `${origin}/products/${best.handle}`,
           priceEur: toEurAmount(amount, "EUR"),
+          inStock: best.variants?.some((variant) => variant.available !== false) ?? true,
         };
       }
     } catch {
@@ -463,6 +546,7 @@ async function searchShopify(supplier: Supplier, query: string): Promise<LiveHit
             title?: string;
             url?: string;
             price?: string | number;
+            available?: boolean;
           }>;
         };
       };
@@ -488,6 +572,7 @@ async function searchShopify(supplier: Supplier, query: string): Promise<LiveHit
       title: best.title ?? query,
       url: productUrl,
       priceEur: toEurAmount(amount, "EUR"),
+      inStock: best.available !== false,
     };
   } catch {
     return null;
@@ -622,7 +707,7 @@ function decodeBingHref(href: string): string {
 
 function parseJsonLdProduct(
   html: string
-): { title?: string; price?: number; currency?: string } | null {
+): { title?: string; price?: number; currency?: string; inStock: boolean | null } | null {
   const blocks = [
     ...html.matchAll(
       /<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi
@@ -647,6 +732,7 @@ function parseJsonLdProduct(
           title: node.name,
           price,
           currency: offer?.priceCurrency ?? "EUR",
+          inStock: availabilityFromValue(offer?.availability),
         };
       }
     } catch {
@@ -719,6 +805,11 @@ async function hydrateFromProductPage(
     title,
     url,
     priceEur: toEurAmount(price, currency),
+    inStock:
+      jsonLd?.inStock ??
+      parseHtmlAvailability(html) ??
+      stockAroundBuyButton(html) ??
+      true,
   };
 }
 
@@ -785,8 +876,10 @@ async function searchHtml(
       const key = link.href.replace(/\/+$/, "").toLowerCase();
       if (seen.has(key)) continue;
       const listed = priceNearUrl(html, link.href);
+      const listedStock = stockNearUrl(html, link.href);
       if (
         listed &&
+        listedStock !== null &&
         (titleMatches(link.title, matchQuery) ||
           titleMatches(titleFromHref(link.href), matchQuery))
       ) {
@@ -796,6 +889,7 @@ async function searchHtml(
           title: link.title,
           url: link.href,
           priceEur: listed,
+          inStock: listedStock,
         });
         if (hits.length >= 2) return hits;
         continue;
@@ -1117,7 +1211,7 @@ function toOffer(hit: LiveHit): ProductOffer {
     productUrl: hit.url,
     linkKind: "product",
     linkLabel: "Отвори продукта",
-    inStock: true,
+    inStock: hit.inStock,
     currency: "EUR",
     price: hit.priceEur,
     priceKind: "listed",
@@ -1140,7 +1234,7 @@ function toOffer(hit: LiveHit): ProductOffer {
 }
 
 export async function fetchLiveOffers(query: string): Promise<LiveOfferResult> {
-  const key = `eur-v9:${query.trim().toLowerCase()}`;
+  const key = `eur-v10:${query.trim().toLowerCase()}`;
   const now = Date.now();
   const cached = cache.get(key);
   if (cached && cached.expiresAt > now) return cached.value;
@@ -1194,6 +1288,7 @@ export async function fetchLiveOffers(query: string): Promise<LiveOfferResult> {
   const offers = unique
     .map(toOffer)
     .sort((a, b) => {
+      if (a.inStock !== b.inStock) return a.inStock ? -1 : 1;
       const boost =
         dentistBoost(b.productName, query) + titleScore(b.productName, query) -
         (dentistBoost(a.productName, query) + titleScore(a.productName, query));
@@ -1201,10 +1296,13 @@ export async function fetchLiveOffers(query: string): Promise<LiveOfferResult> {
       return a.total - b.total;
     })
     .slice(0, 16);
-  const worst = offers[offers.length - 1]?.total ?? 0;
+  const stocked = offers.filter((offer) => offer.inStock);
+  const worst = (stocked.length ? stocked : offers).at(-1)?.total ?? 0;
   const ranked = offers.map((offer) => ({
     ...offer,
-    savingsVsWorst: round2(Math.max(0, worst - offer.total)),
+    savingsVsWorst: offer.inStock
+      ? round2(Math.max(0, worst - offer.total))
+      : 0,
   }));
 
   const value = { offers: ranked, uncheckedShops: unchecked };

@@ -53,7 +53,9 @@ export function AddToComboButton({
         <Layers3 className="h-4 w-4 text-[var(--accent)]" />
         {status === "added"
           ? `В количката на ${offer.supplierName}`
-          : `Добави в ${offer.supplierName}`}
+          : offer.inStock
+            ? `Добави в ${offer.supplierName}`
+            : `Добави въпреки че е изчерпан`}
       </button>
       {status === "conflict" && otherShop && (
         <div className="rounded-2xl bg-[var(--surface)] px-3 py-2 text-xs text-[var(--muted)]">
