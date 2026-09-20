@@ -6,6 +6,7 @@ import { signOut, useSession } from "next-auth/react";
 import { useEffect, useRef, useState } from "react";
 import { Clock3, LogOut, Menu, Search, X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { LocalTime } from "@/components/local-time";
 
 type RecentItem = {
   id: string;
@@ -14,7 +15,7 @@ type RecentItem = {
 };
 
 export function SiteHeader() {
-  const { data: session, status } = useSession();
+  const { data: session } = useSession();
   const pathname = usePathname();
   const [openRecent, setOpenRecent] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -81,9 +82,11 @@ export function SiteHeader() {
           >
             Как работи
           </Link>
+        </nav>
 
+        <div className="flex items-center gap-2">
           {session?.user ? (
-            <div className="relative ml-2" ref={panelRef}>
+            <div className="relative" ref={panelRef}>
               <button
                 type="button"
                 onClick={() => {
@@ -99,7 +102,7 @@ export function SiteHeader() {
                 )}
               >
                 <Clock3 className="h-4 w-4" />
-                Скорошни
+                <span className="hidden sm:inline">Скорошни</span>
               </button>
 
               {openRecent && (
@@ -137,7 +140,7 @@ export function SiteHeader() {
                               {item.query}
                             </span>
                             <span className="text-xs text-[var(--muted)]">
-                              {new Date(item.createdAt).toLocaleString("bg-BG")}
+                              <LocalTime iso={item.createdAt} mode="datetime" />
                             </span>
                           </span>
                         </Link>
@@ -156,8 +159,8 @@ export function SiteHeader() {
                 </div>
               )}
             </div>
-          ) : status !== "loading" ? (
-            <div className="ml-2 flex items-center gap-2">
+          ) : (
+            <div className="flex items-center gap-1 sm:gap-2">
               <Link
                 href="/login"
                 className="rounded-lg px-3 py-2 text-sm text-[var(--muted)] transition hover:text-[var(--ink)]"
@@ -166,22 +169,22 @@ export function SiteHeader() {
               </Link>
               <Link
                 href="/register"
-                className="rounded-full bg-[var(--accent)] px-4 py-2 text-sm font-medium text-white transition hover:bg-[var(--accent-deep)]"
+                className="rounded-full bg-[var(--accent)] px-3 py-2 text-sm font-medium text-white transition hover:bg-[var(--accent-deep)] sm:px-4"
               >
                 Регистрация
               </Link>
             </div>
-          ) : null}
-        </nav>
+          )}
 
-        <button
-          type="button"
-          className="rounded-lg p-2 text-[var(--ink)] md:hidden"
-          onClick={() => setMobileOpen((v) => !v)}
-          aria-label="Меню"
-        >
-          {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-        </button>
+          <button
+            type="button"
+            className="rounded-lg p-2 text-[var(--ink)] md:hidden"
+            onClick={() => setMobileOpen((v) => !v)}
+            aria-label="Меню"
+          >
+            {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+          </button>
+        </div>
       </div>
 
       {mobileOpen && (
@@ -216,19 +219,7 @@ export function SiteHeader() {
                   Изход
                 </button>
               </>
-            ) : (
-              <>
-                <Link href="/login" className="rounded-lg px-3 py-2 text-sm">
-                  Вход
-                </Link>
-                <Link
-                  href="/register"
-                  className="rounded-lg bg-[var(--accent)] px-3 py-2 text-center text-sm text-white"
-                >
-                  Регистрация
-                </Link>
-              </>
-            )}
+            ) : null}
           </div>
 
           {session?.user && openRecent && (

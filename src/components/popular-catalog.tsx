@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { ArrowUpRight, RefreshCw } from "lucide-react";
+import { LocalTime } from "@/components/local-time";
 
 type CatalogItem = {
   slug: string;
@@ -48,16 +49,9 @@ export function PopularCatalog({
           <RefreshCw className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[var(--accent)]" />
           <span>
             {cached ? "От кеш" : "Прясно обновено"} ·{" "}
-            {new Date(refreshedAt).toLocaleTimeString("bg-BG", {
-              hour: "2-digit",
-              minute: "2-digit",
-            })}
+            <LocalTime iso={refreshedAt} />
             <br />
-            следващо:{" "}
-            {new Date(nextRefreshAt).toLocaleTimeString("bg-BG", {
-              hour: "2-digit",
-              minute: "2-digit",
-            })}
+            следващо: <LocalTime iso={nextRefreshAt} />
           </span>
         </div>
       </div>

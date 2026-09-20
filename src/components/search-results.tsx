@@ -3,6 +3,7 @@ import type { ProductOffer } from "@/lib/products";
 import type { SearchResult } from "@/lib/search";
 import { formatEur } from "@/lib/utils";
 import { AddToComboButton } from "@/components/add-to-combo-button";
+import { LocalTime } from "@/components/local-time";
 
 function regionLabel(region: ProductOffer["region"]) {
   if (region === "BG") return "България";
@@ -193,7 +194,7 @@ export function SearchResults({ result }: { result: SearchResult }) {
           {result.priceDisclaimer}
         </p>
         <p className="mt-1 text-xs text-[var(--muted)]">
-          Проверено: {new Date(result.checkedAt).toLocaleString("bg-BG")}
+          Проверено: <LocalTime iso={result.checkedAt} mode="datetime" />
         </p>
       </div>
 
