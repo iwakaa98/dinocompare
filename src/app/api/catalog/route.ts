@@ -7,7 +7,7 @@ export async function GET() {
   const catalog = await getPopularCatalog();
   return NextResponse.json(catalog, {
     headers: {
-      "Cache-Control": "public, s-maxage=420, stale-while-revalidate=120",
+      "Cache-Control": "public, s-maxage=600, stale-while-revalidate=120",
     },
   });
 }

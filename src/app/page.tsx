@@ -98,7 +98,7 @@ export default async function HomePage({ searchParams }: HomeProps) {
               Кеширан каталог
             </h3>
             <p className="mt-2 text-sm leading-relaxed text-[var(--muted)]">
-              Най-търсените продукти се обновяват на ~7 минути, за да е бързо
+              Най-търсените продукти се обновяват на ~10 минути, за да е бързо
               зареждането в натоварен кабинет.
             </p>
           </div>

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { ArrowUpRight, RefreshCw } from "lucide-react";
-import { LocalTime } from "@/components/local-time";
+import { CatalogRefresh } from "@/components/catalog-refresh";
 
 type CatalogItem = {
   slug: string;
@@ -26,10 +26,8 @@ type Props = {
 
 export function PopularCatalog({
   items,
-  refreshedAt,
   nextRefreshAt,
   ttlMinutes,
-  cached,
 }: Props) {
   return (
     <section id="catalog" className="scroll-mt-24">
@@ -48,12 +46,7 @@ export function PopularCatalog({
         </div>
         <div className="inline-flex items-start gap-2 rounded-2xl border border-[var(--line)] bg-white/70 px-3 py-2 text-xs text-[var(--muted)]">
           <RefreshCw className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[var(--accent)]" />
-          <span>
-            {cached ? "От кеш" : "Прясно обновено"} ·{" "}
-            <LocalTime iso={refreshedAt} />
-            <br />
-            следващо: <LocalTime iso={nextRefreshAt} />
-          </span>
+          <CatalogRefresh nextRefreshAt={nextRefreshAt} ttlMinutes={ttlMinutes} />
         </div>
       </div>
 

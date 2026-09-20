@@ -27,7 +27,7 @@ const catalogCache = new Map<
   { expiresAt: number; payload: Awaited<ReturnType<typeof computePopularCatalog>> }
 >();
 
-const CACHE_TTL_MS = 7 * 60 * 1000;
+const CACHE_TTL_MS = 10 * 60 * 1000;
 
 export async function runProductSearch(query: string): Promise<SearchResult> {
   const trimmed = query.trim();
@@ -113,18 +113,31 @@ async function computePopularCatalog() {
   try {
     stats = await prisma.productStat.findMany({
       orderBy: [{ searchCount: "desc" }, { lastSearched: "desc" }],
-      take: 8,
+      take: 24,
     });
   } catch {
     stats = [];
   }
 
-  const fromStats = stats.map((stat) => ({
-    product:
-      CATALOG.find((p) => p.slug === stat.productSlug) ??
-      resolveProduct(stat.query),
-    searchCount: stat.searchCount,
-  }));
+  const merged = new Map<
+    string,
+    { product: CatalogProduct; searchCount: number }
+  >();
+  for (const stat of stats) {
+    const product =
+      CATALOG.find((item) => item.slug === stat.productSlug) ??
+      resolveProduct(stat.query);
+    if (product.brand === "Общо търсене") continue;
+    const prev = merged.get(product.slug);
+    if (!prev) {
+      merged.set(product.slug, { product, searchCount: stat.searchCount });
+    } else {
+      prev.searchCount += stat.searchCount;
+    }
+  }
+  const fromStats = [...merged.values()].sort(
+    (a, b) => b.searchCount - a.searchCount
+  );
   const used = new Set(fromStats.map((row) => row.product.slug));
   const filler = CATALOG.filter((product) => !used.has(product.slug)).map(
     (product) => ({ product, searchCount: 0 })
