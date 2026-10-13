@@ -8,6 +8,7 @@
     "start": "node scripts/start.mjs",
     "start:local": "next start -H 127.0.0.1 -p 43127",
     "lint": "eslint",
+    "qa:trust": "tsx scripts/qa-offer-trust.ts",
     "db:up": "docker compose up -d",
     "db:migrate": "prisma migrate deploy",
     "db:migrate:dev": "prisma migrate dev",
@@ -32,6 +33,7 @@
     "prisma": "^6.19.3",
     "react": "19.2.8",
     "react-dom": "19.2.8",
+    "stripe": "^17.7.0",
     "tailwind-merge": "^3.7.0",
     "zod": "^4.6.5"
   },

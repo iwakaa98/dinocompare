@@ -1,6 +1,8 @@
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { fetchLiveOffers } from "@/lib/live-offers";
+import { applySearchPaywall } from "@/lib/search-gate";
+import { userHasFullSearchAccess } from "@/lib/user-plan";
 import {
   CATALOG,
   PRICE_DISCLAIMER,
@@ -86,16 +88,21 @@ export async function runProductSearch(query: string): Promise<SearchResult> {
   }
   catalogCache.clear();
 
-  return {
-    query: trimmed,
-    product,
-    offers,
-    bestOffers,
-    checkedAt: new Date().toISOString(),
-    suppliersChecked: live.offers.length + live.uncheckedShops.length,
-    priceDisclaimer: PRICE_DISCLAIMER,
-    uncheckedShops,
-  };
+  const fullAccess = await userHasFullSearchAccess();
+
+  return applySearchPaywall(
+    {
+      query: trimmed,
+      product,
+      offers,
+      bestOffers,
+      checkedAt: new Date().toISOString(),
+      suppliersChecked: live.offers.length + live.uncheckedShops.length,
+      priceDisclaimer: PRICE_DISCLAIMER,
+      uncheckedShops,
+    },
+    fullAccess
+  );
 }
 
 async function computePopularCatalog() {
@@ -132,21 +139,40 @@ async function computePopularCatalog() {
   const filler = CATALOG.filter((product) => !used.has(product.slug)).map(
     (product) => ({ product, searchCount: 0 })
   );
-  const source = [...fromStats, ...filler].slice(0, 8);
+  const withSearches = fromStats.filter((row) => row.searchCount > 0);
+  const source = [...withSearches, ...filler].slice(0, 8);
 
-  return source.map(({ product, searchCount }) => ({
-    slug: product.slug,
-    name: product.name,
-    searchQuery: product.searchQuery || product.name,
-    brand: product.brand,
-    category: product.category,
-    unit: product.unit,
-    description: product.description,
-    searchCount,
-    bestTotal: null as number | null,
-    bestSupplier: "на живо при търсене",
-    offerCount: 0,
-  }));
+  const slugs = source.map((row) => row.product.slug);
+  let snapshots: Awaited<ReturnType<typeof prisma.catalogSnapshot.findMany>> =
+    [];
+  try {
+    snapshots = await prisma.catalogSnapshot.findMany({
+      where: { productSlug: { in: slugs } },
+    });
+  } catch {
+    snapshots = [];
+  }
+  const snapBySlug = new Map(snapshots.map((row) => [row.productSlug, row]));
+
+  return source.map(({ product, searchCount }) => {
+    const snap = snapBySlug.get(product.slug);
+    return {
+      slug: product.slug,
+      name: product.name,
+      searchQuery: product.searchQuery || product.name,
+      brand: product.brand,
+      category: product.category,
+      unit: product.unit,
+      description: product.description,
+      searchCount,
+      bestTotal: snap?.bestTotal ?? null,
+      savingsEur: snap?.savingsEur ?? null,
+      bestSupplier: snap?.offerCount
+        ? `${snap.offerCount} оферти`
+        : "на живо при търсене",
+      offerCount: snap?.offerCount ?? 0,
+    };
+  });
 }
 
 export async function getPopularCatalog() {

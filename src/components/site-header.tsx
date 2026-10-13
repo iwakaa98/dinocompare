@@ -7,6 +7,8 @@ import { useEffect, useRef, useState } from "react";
 import { Clock3, LogOut, Menu, Search, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { LocalTime } from "@/components/local-time";
+import { ManageSubscriptionButton } from "@/components/manage-subscription-button";
+import { planLabel } from "@/lib/entitlements";
 
 type RecentItem = {
   id: string;
@@ -86,9 +88,26 @@ export function SiteHeader() {
           >
             Как работи
           </Link>
+          <Link
+            href="/pricing"
+            className="rounded-lg px-3 py-2 text-sm text-[var(--muted)] transition hover:bg-[var(--surface)] hover:text-[var(--ink)]"
+          >
+            Планове
+          </Link>
         </nav>
 
         <div className="flex items-center gap-2">
+          {session?.user && (
+            <Link
+              href="/pricing"
+              className="hidden rounded-full border border-[var(--line)] bg-white/80 px-2.5 py-1 text-xs font-medium text-[var(--muted)] transition hover:text-[var(--ink)] sm:inline"
+            >
+              План:{" "}
+              {session.user.planStatus === "active" && session.user.plan
+                ? planLabel(session.user.plan)
+                : "Free"}
+            </Link>
+          )}
           {session?.user ? (
             <div className="relative" ref={panelRef}>
               <button
@@ -151,6 +170,11 @@ export function SiteHeader() {
                       ))}
                   </div>
                   <div className="border-t border-[var(--line)] p-2">
+                    {session.user.planStatus === "active" &&
+                      (session.user.plan === "pro" ||
+                        session.user.plan === "clinic") && (
+                        <ManageSubscriptionButton label="Управление на абонамент" />
+                      )}
                     <button
                       type="button"
                       onClick={() => signOut({ callbackUrl: "/" })}
@@ -202,6 +226,9 @@ export function SiteHeader() {
             </Link>
             <Link href={withQuery("#how")} className="rounded-lg px-3 py-2 text-sm">
               Как работи
+            </Link>
+            <Link href="/pricing" className="rounded-lg px-3 py-2 text-sm">
+              Планове
             </Link>
             {session?.user ? (
               <>

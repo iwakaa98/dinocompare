@@ -10,8 +10,9 @@ import {
   type ComboItem,
 } from "@/lib/combo";
 import { formatEur } from "@/lib/utils";
+import { UnlockSearchCta } from "@/components/unlock-search-cta";
 
-export function ComboPlanner() {
+export function ComboPlanner({ locked = false }: { locked?: boolean }) {
   const [items, setItems] = useState<ComboItem[]>([]);
 
   useEffect(() => {
@@ -51,7 +52,18 @@ export function ComboPlanner() {
         </div>
       </div>
 
-      {items.length === 0 || !shop ? (
+      {locked && (
+        <div className="mt-6">
+          <UnlockSearchCta />
+        </div>
+      )}
+
+      {locked ? (
+        <p className="mt-4 text-sm text-[var(--muted)]">
+          Количката „Комбинирай“ е част от Pro — добавяте от пълните резултати след
+          абонамент.
+        </p>
+      ) : items.length === 0 || !shop ? (
         <p className="mt-4 text-sm text-[var(--muted)]">
           От резултатите натиснете „Добави в [магазин]“. Ако смените сайта,
           количката се заменя.

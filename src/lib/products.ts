@@ -1,3 +1,5 @@
+import type { OfferKind } from "@/lib/offer-classification";
+
 export type SupplierRegion = "BG" | "EU" | "INTL";
 export type OfferLinkKind = "product" | "search";
 
@@ -39,6 +41,7 @@ export type ProductOffer = {
   linkKind: OfferLinkKind;
   linkLabel: string;
   inStock: boolean;
+  offerKind: OfferKind;
   currency: "EUR";
   price: number;
   priceKind: "listed" | "estimate";
@@ -83,6 +86,9 @@ export type SearchResult = {
   suppliersChecked: number;
   priceDisclaimer: string;
   uncheckedShops: UncheckedShop[];
+  locked: boolean;
+  maxSavingsEur: number;
+  confirmedOfferCount: number;
 };
 
 export const BG_FREE_SHIPPING_FROM = 60;
@@ -593,4 +599,4 @@ function slugFromQuery(query: string): string {
 }
 
 export const PRICE_DISCLAIMER =
-  "Цената и линкът идват на живо от магазина — само ако заглавието съвпада с търсенето. Всички суми са в евро. Доставката и митницата са калкулация към България.";
+  "Цената и линкът идват на живо от магазина — сравняваме по заглавие на страницата. Проверете дали е основен продукт, комплект или консуматив. Сумите са в евро; доставка и митница са калкулация към България.";

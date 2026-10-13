@@ -3,6 +3,7 @@ import { CompareWorkspace } from "@/components/compare-workspace";
 import { PopularCatalog } from "@/components/popular-catalog";
 import { SearchForm } from "@/components/search-form";
 import { getPopularCatalog } from "@/lib/search";
+import { userHasFullSearchAccess } from "@/lib/user-plan";
 
 export const dynamic = "force-dynamic";
 
@@ -14,6 +15,7 @@ export default async function HomePage({ searchParams }: HomeProps) {
   const params = await searchParams;
   const query = typeof params.q === "string" ? params.q : "";
   const catalog = await getPopularCatalog();
+  const catalogUnlocked = await userHasFullSearchAccess();
 
   return (
     <div>
@@ -48,7 +50,7 @@ export default async function HomePage({ searchParams }: HomeProps) {
         </div>
       </section>
 
-      <CompareWorkspace query={query} />
+      <CompareWorkspace query={query} fullAccess={catalogUnlocked} />
 
       <section className="mx-auto max-w-6xl px-4 pb-20 sm:px-6">
         <PopularCatalog
@@ -57,6 +59,7 @@ export default async function HomePage({ searchParams }: HomeProps) {
           nextRefreshAt={catalog.nextRefreshAt}
           ttlMinutes={catalog.ttlMinutes}
           cached={catalog.cached}
+          savingsLocked={!catalogUnlocked}
         />
       </section>
 

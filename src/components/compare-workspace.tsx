@@ -14,7 +14,13 @@ function tabFromHash(): Tab {
   return window.location.hash === "#combo" ? "combo" : "results";
 }
 
-export function CompareWorkspace({ query }: { query: string }) {
+export function CompareWorkspace({
+  query,
+  fullAccess,
+}: {
+  query: string;
+  fullAccess: boolean;
+}) {
   const [tab, setTab] = useState<Tab>(query ? "results" : "combo");
   const [comboCount, setComboCount] = useState(0);
 
@@ -87,7 +93,7 @@ export function CompareWorkspace({ query }: { query: string }) {
         )}
       </div>
       <div className={tab === "combo" ? "" : "hidden"}>
-        <ComboPlanner />
+        <ComboPlanner locked={!fullAccess} />
       </div>
     </section>
   );

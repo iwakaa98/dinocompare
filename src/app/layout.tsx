@@ -38,6 +38,10 @@ export default function RootLayout({ children }: { children: ReactNode }) {
             <div className="mx-auto max-w-6xl px-4">
               DentSravni · живи цени от български, европейски и международни
               магазини · митница по правилата за внос в България / ЕС
+              <div className="mt-2 flex flex-wrap justify-center gap-4 text-xs">
+                <a href="/pricing" className="hover:text-[var(--ink)]">Планове</a>
+                <a href="/terms" className="hover:text-[var(--ink)]">Условия</a>
+              </div>
             </div>
           </footer>
         </AuthProvider>

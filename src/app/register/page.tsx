@@ -14,8 +14,8 @@ export default function RegisterPage() {
         Създайте акаунт
       </h1>
       <p className="mt-2 text-[var(--muted)]">
-        Безплатно засега — готови сме за subscription модел, когато ви е
-        нужно.
+        Акаунтът е безплатен. Търсенето с пълни оферти и линкове е с Pro или
+        Clinic — вижте <Link href="/pricing" className="text-[var(--accent-deep)] underline">цените</Link>.
       </p>
       <div className="mt-8 rounded-3xl border border-[var(--line)] bg-white/80 p-6 shadow-[0_16px_40px_rgba(15,60,55,0.06)]">
         <RegisterForm />

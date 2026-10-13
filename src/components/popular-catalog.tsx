@@ -12,6 +12,7 @@ type CatalogItem = {
   description: string;
   searchCount: number;
   bestTotal: number | null;
+  savingsEur: number | null;
   bestSupplier: string;
   offerCount: number;
 };
@@ -22,12 +23,14 @@ type Props = {
   nextRefreshAt: string;
   ttlMinutes: number;
   cached: boolean;
+  savingsLocked?: boolean;
 };
 
 export function PopularCatalog({
   items,
   nextRefreshAt,
   ttlMinutes,
+  savingsLocked = true,
 }: Props) {
   return (
     <section id="catalog" className="scroll-mt-24">
@@ -70,9 +73,21 @@ export function PopularCatalog({
             <p className="mt-1 text-sm text-[var(--muted)]">
               {item.brand} · {item.unit}
             </p>
-            <p className="mt-4 text-sm font-medium text-[var(--accent-deep)]">
-              Сравни на живо
-            </p>
+            {item.savingsEur != null && item.savingsEur > 0.5 ? (
+              <p
+                className={`mt-4 text-sm font-medium text-[var(--accent-deep)] ${
+                  savingsLocked ? "blur-sm" : ""
+                }`}
+              >
+                {savingsLocked
+                  ? "До ••• € разлика (Pro)"
+                  : `До ${item.savingsEur.toFixed(2)} € разлика`}
+              </p>
+            ) : (
+              <p className="mt-4 text-sm font-medium text-[var(--accent-deep)]">
+                Сравни на живо
+              </p>
+            )}
             <p className="mt-1 text-xs text-[var(--muted)]">
               {item.searchCount > 0
                 ? `${item.searchCount} търсения`

@@ -8,12 +8,18 @@ datasource db {
 }
 
 model User {
-  id           String         @id @default(cuid())
-  email        String         @unique
-  name         String
-  passwordHash String
-  createdAt    DateTime       @default(now())
-  searches     SearchHistory[]
+  id                   String         @id @default(cuid())
+  email                String         @unique
+  name                 String
+  passwordHash         String
+  stripeCustomerId     String?        @unique
+  stripeSubscriptionId String?
+  plan                 String         @default("free")
+  planStatus           String         @default("inactive")
+  planCurrentPeriodEnd DateTime?
+  searchQuotaMonth     Int            @default(0)
+  createdAt            DateTime       @default(now())
+  searches             SearchHistory[]
 }
 
 model SearchHistory {
@@ -34,4 +40,15 @@ model ProductStat {
   searchCount  Int      @default(1)
   lastSearched DateTime @default(now())
   updatedAt    DateTime @updatedAt
+}
+
+model CatalogSnapshot {
+  productSlug  String   @id
+  searchQuery  String
+  searchCount  Int      @default(0)
+  bestTotal    Float?
+  worstTotal   Float?
+  savingsEur   Float?
+  offerCount   Int      @default(0)
+  refreshedAt  DateTime
 }

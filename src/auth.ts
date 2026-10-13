@@ -3,6 +3,7 @@ import Credentials from "next-auth/providers/credentials";
 import { compare } from "bcryptjs";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
+import type { PlanId } from "@/lib/entitlements";
 
 const credentialsSchema = z.object({
   email: z.string().email(),
@@ -52,10 +53,18 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       return token;
     },
     async session({ session, token }) {
-      if (session.user) {
-        session.user.id = token.sub ?? "";
+      if (session.user && token.sub) {
+        session.user.id = token.sub;
         session.user.name = token.name ?? session.user.name;
         session.user.email = token.email ?? session.user.email;
+        const dbUser = await prisma.user.findUnique({
+          where: { id: token.sub },
+          select: { plan: true, planStatus: true },
+        });
+        if (dbUser) {
+          session.user.plan = dbUser.plan as PlanId;
+          session.user.planStatus = dbUser.planStatus;
+        }
       }
       return session;
     },

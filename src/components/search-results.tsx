@@ -2,6 +2,10 @@
 
 import { ExternalLink, Package, Truck, Warehouse } from "lucide-react";
 import {
+  canBeBestOffer,
+  offerKindLabel,
+} from "@/lib/offer-classification";
+import {
   remainingToFreeShipping,
   shopCheckoutInfo,
   shopInvoiceNote,
@@ -12,6 +16,7 @@ import type { SearchResult } from "@/lib/products";
 import { formatEur } from "@/lib/utils";
 import { AddToComboButton } from "@/components/add-to-combo-button";
 import { LocalTime } from "@/components/local-time";
+import { UnlockSearchCta } from "@/components/unlock-search-cta";
 
 function regionLabel(region: ProductOffer["region"]) {
   if (region === "BG") return "България";
@@ -23,16 +28,27 @@ function OfferRow({
   offer,
   rank,
   product,
+  query,
+  locked,
 }: {
   offer: ProductOffer;
   rank: number;
   product: SearchResult["product"];
+  query: string;
+  locked: boolean;
 }) {
-  const isBest = rank === 1 && offer.inStock;
+  const isBest =
+    rank === 1 &&
+    offer.inStock &&
+    canBeBestOffer(offer.offerKind, query) &&
+    !locked;
+  const kindLabel = offerKindLabel(offer.offerKind);
 
   return (
     <article
       className={`relative overflow-hidden rounded-3xl border p-5 sm:p-6 ${
+        locked ? "select-none" : ""
+      } ${
         !offer.inStock
           ? "border-amber-300/80 bg-amber-50/50"
           : isBest
@@ -65,11 +81,20 @@ function OfferRow({
               ? ` · ${offer.packLabel}`
               : ""}
           </p>
+          {kindLabel && (
+            <p className="mt-2 text-xs font-medium text-[var(--muted)]">
+              {kindLabel}
+            </p>
+          )}
         </div>
         <div className="text-left sm:text-right">
           <p className="text-sm text-[var(--muted)]">Общо на касата</p>
-          <p className="font-[family-name:var(--font-display)] text-3xl text-[var(--accent-deep)]">
-            {formatEur(offer.total)}
+          <p
+            className={`font-[family-name:var(--font-display)] text-3xl text-[var(--accent-deep)] ${
+              locked ? "blur-md" : ""
+            }`}
+          >
+            {locked ? "••• €" : formatEur(offer.total)}
           </p>
           {!offer.inStock && (
             <p className="mt-1 text-xs font-medium text-amber-800">
@@ -162,18 +187,20 @@ function OfferRow({
         );
       })()}
 
-      <div className="mt-5 flex flex-wrap items-center gap-3">
-        <a
-          href={offer.productUrl}
-          target="_blank"
-          rel="noreferrer"
-          className="inline-flex items-center gap-2 rounded-full bg-[var(--accent)] px-4 py-2 text-sm font-medium text-white transition hover:bg-[var(--accent-deep)]"
-        >
-          {offer.linkLabel}
-          <ExternalLink className="h-4 w-4" />
-        </a>
-        <AddToComboButton product={product} offer={offer} />
-      </div>
+      {!locked && offer.productUrl && (
+        <div className="mt-5 flex flex-wrap items-center gap-3">
+          <a
+            href={offer.productUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-2 rounded-full bg-[var(--accent)] px-4 py-2 text-sm font-medium text-white transition hover:bg-[var(--accent-deep)]"
+          >
+            {offer.linkLabel}
+            <ExternalLink className="h-4 w-4" />
+          </a>
+          <AddToComboButton product={product} offer={offer} />
+        </div>
+      )}
     </article>
   );
 }
@@ -248,15 +275,25 @@ export function SearchResults({ result }: { result: SearchResult }) {
         </p>
         <p className="mt-1 text-xs text-[var(--muted)]">
           Проверено: <LocalTime iso={result.checkedAt} mode="datetime" />
+          {result.locked && result.confirmedOfferCount > 0 && (
+            <>
+              {" "}
+              · {result.confirmedOfferCount} потвърдени оферти (Pro)
+            </>
+          )}
         </p>
       </div>
 
+      {result.locked && <UnlockSearchCta savingsEur={result.maxSavingsEur} />}
+
       {result.offers.map((offer, index) => (
         <OfferRow
-          key={`${offer.supplierId}-${offer.productUrl}`}
+          key={`${offer.supplierId}-${index}`}
           offer={offer}
           rank={index + 1}
           product={result.product}
+          query={result.query}
+          locked={result.locked}
         />
       ))}
 

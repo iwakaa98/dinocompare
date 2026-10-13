@@ -1,4 +1,8 @@
 import {
+  offerKindRank,
+  classifyOfferKind,
+} from "@/lib/offer-classification";
+import {
   SUPPLIERS,
   quoteShipment,
   round2,
@@ -175,6 +179,16 @@ function looksWrongVariant(title: string, query: string): boolean {
   }
   if (/optibond/i.test(q) && /\bfl\b/i.test(q)) {
     if (/solo|universal|extra|ецващ|etchant/i.test(t) && !/\bfl\b/i.test(t)) {
+      return true;
+    }
+  }
+  if (/panavia/i.test(q) && !/\b(tip|tips|mixing|накрайник)\b/i.test(q)) {
+    if (
+      /\b(mixing[\s_-]?tip|tip[\s_-]?pack|tips[\s_-]?regular|mixing[\s_-]?tips)\b/i.test(
+        t
+      ) &&
+      !/\b(cement|kit|handmix|intro|цимент|комплект)\b/i.test(t)
+    ) {
       return true;
     }
   }
@@ -1342,7 +1356,7 @@ async function discoverExtra(
   return hits;
 }
 
-function toOffer(hit: LiveHit): ProductOffer {
+function toOffer(hit: LiveHit, query: string): ProductOffer {
   const quote = quoteShipment({
     supplier: hit.supplier,
     goodsEur: hit.priceEur,
@@ -1359,6 +1373,7 @@ function toOffer(hit: LiveHit): ProductOffer {
     linkKind: "product",
     linkLabel: "Отвори продукта",
     inStock: hit.inStock,
+    offerKind: classifyOfferKind(hit.title, query),
     currency: "EUR",
     price: hit.priceEur,
     priceKind: "listed",
@@ -1447,9 +1462,11 @@ export async function fetchLiveOffers(query: string): Promise<LiveOfferResult> {
   const unique = dedupeHits(hits);
 
   const offers = unique
-    .map(toOffer)
+    .map((hit) => toOffer(hit, query))
     .sort((a, b) => {
       if (a.inStock !== b.inStock) return a.inStock ? -1 : 1;
+      const kindDiff = offerKindRank(a.offerKind) - offerKindRank(b.offerKind);
+      if (kindDiff !== 0) return kindDiff;
       const boost =
         dentistBoost(b.productName, query) + titleScore(b.productName, query) -
         (dentistBoost(a.productName, query) + titleScore(a.productName, query));
